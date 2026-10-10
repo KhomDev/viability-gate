@@ -1,0 +1,43 @@
+version: 2
+updates:
+  # Rust dependencies. The dependency graph is deliberately tiny (five direct
+  # crates, 39 packages total) and every addition is a supply-chain decision, so
+  # updates are grouped into one pull request rather than one per crate.
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Budapest
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - dependencies
+    groups:
+      cargo:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # GitHub Actions used by ci.yml and release.yml.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Budapest
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - dependencies
+      - ci
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The Python tooling (scripts/ and tools/) is stdlib plus PyYAML. There is no
+  # requirements file, so pip updates are not applicable. If a requirements file
+  # is ever added, add a pip entry here.

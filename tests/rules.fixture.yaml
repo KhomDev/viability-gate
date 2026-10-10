@@ -1,0 +1,154 @@
+# Rule fixtures - one positive, one negative, and (where a defect was reproduced)
+# one regression case per anti-pattern.
+#
+#   fires             must trigger the named rule.
+#   suppressed        must NOT trigger it, either because nothing matches or
+#                     because a none_of escape hatch is present.
+#   regression        the exact counterexample text from a reproduced defect,
+#                     checked with regression_expect ("fires" or "silent").
+#   regression_verdict  optional expected verdict for a regression case.
+#
+# A regression case is only added when the defect was actually reproduced. See
+# docs/rule-defect-report.md for which ones were, and which were not.
+#
+# These are SYNTHETIC findings written to exercise the matchers. They are not
+# real reports, they describe no real target, and none was copied from anyone's
+# submission.
+#
+# Run with: cargo test --release
+
+version: 1
+
+cases:
+  - rule: P1
+    fires: "This is not currently exploitable, but the pattern is dangerous."
+    suppressed: "An unprivileged attacker drains the vault in a single transaction."
+    # REPRODUCED: the bare word "hypothetical" hard-killed a careful report.
+    regression: "In the hypothetical case where the pool is manipulated, the swap returns less than the caller expects."
+    regression_expect: silent
+
+  - rule: P6
+    fires: "If a future upgrade removes the guard, this becomes Critical."
+    suppressed: "The guard is absent today and the attacker profits today."
+
+  - rule: P12
+    fires: "The transaction reverts. Direct fund loss: None. The function is read-only."
+    suppressed: "The panic skips the fee accrual, permanently under-crediting the next depositor."
+
+  - rule: P13
+    fires: "This creates inconsistent state and violates the accounting invariant."
+    suppressed: "The accounting drift lets the attacker extract 8.925300 USDC per cycle."
+
+  - rule: P2
+    fires: "An admin can set the fee to 100 percent and brick liquidations."
+    suppressed: "Any caller can invoke this; unprivileged escalation is demonstrated."
+    # REPRODUCED: the prose form "only the owner" was not matched at all, because
+    # the old pattern glued the identifier to the word "only".
+    regression: "Only the owner can rotate the oracle, and the rotation silently changes the collateral factor."
+    regression_expect: fires
+
+  - rule: P2
+    fires: "The pause flag is set by the admin."
+    suppressed: "The pause flag is set by the admin, and the same sentence states any caller can trigger it."
+    # REPRODUCED: one "permissionless" ANYWHERE in the document switched the rule
+    # off, even when it described an unrelated sentence.
+    regression: "An admin can set the pause flag to zero and brick the vault. Elsewhere, an unrelated entrypoint is permissionless."
+    regression_expect: fires
+
+  - rule: P3
+    fires: "The attacker front-runs the operator's update call."
+    suppressed: "The attack is atomic in one transaction via a flash loan."
+    # REPRODUCED: no negation handling, so "there is no front-run exposure" fired.
+    regression: "There is no front-run exposure in this path."
+    regression_expect: silent
+
+  - rule: P5
+    fires: "The root cause is outside the scope of the audited tree."
+    suppressed: "The root cause is inside the in-scope sources tree at the pinned commit."
+    # REPRODUCED: the rule matched the PoC's OWN path, so citing your own test
+    # file killed the report.
+    regression: "# Finding\n\nThe root cause is inside the in-scope tree.\n\n## Proof of concept\n\nThe harness lives in tests/poc.sol outside the scope.\n"
+    regression_expect: silent
+
+  - rule: P11
+    fires: "Reproduced on testnet only; mainnet is unaffected."
+    suppressed: "Verified against the live mainnet deployment at the pinned block."
+
+  - rule: P20
+    fires: "Exploitation requires a cooperating LP to exit during the flash loan."
+    suppressed: "One unprivileged attacker acting alone triggers the full impact."
+
+  - rule: P7
+    fires: "The canonical implementation uses >= so this deviation from best practice is wrong."
+    suppressed: "The strict comparison lets the attacker extract funds after expiry."
+
+  - rule: P16
+    fires: "This is below the payout floor; the program is critical-only."
+    suppressed: "The program pays Medium and above, and this reaches High."
+
+  - rule: P18
+    fires: "This was already reported in a prior audit and accepted as intended."
+    suppressed: "No prior audit covers this module; the surface is new since the last review."
+    # REPRODUCED: the bare phrase "prior audit" hard-killed the strongest possible
+    # argument - that the prior audit MISSED the bug.
+    regression: "The prior audit missed this path entirely; it did not cover this module."
+    regression_expect: silent
+
+  - rule: P21
+    fires: "At the documented configuration the margin is negative, so assume a non-default config."
+    suppressed: "Measured at the deployed configuration with representative bounds."
+
+  - rule: P22
+    fires: "The maker must choose to deploy this composition; no deployed instance exists."
+    suppressed: "The deployed instance at the documented strategy exhibits this behaviour."
+
+  - rule: P15
+    fires: "The behaviour is by design and the test suite validates it."
+    suppressed: "No test covers this path; the branch is unreachable from any test."
+    # REPRODUCED: "contradicts the documented behaviour" - the strongest form of
+    # the argument - matched the bare phrase "documented behaviour" and hard-failed.
+    regression: "The implementation contradicts the documented behaviour: the docs say fees accrue per second, but the code accrues only on deposit."
+    regression_expect: silent
+
+  - rule: P4
+    fires: "The PoC uses a MockVault instead of the real contract, and imports a mock."
+    suppressed: "The PoC imports the real in-scope contract and asserts the delta."
+    # REPRODUCED: case-insensitive matching made "[A-Z]" match any letter, so
+    # "stubborn" and "mocked" fired; MockERC20 is ordinary PoC scaffolding.
+    regression: "The check is stubborn and the helper was mocked. The PoC uses MockERC20 as the token."
+    regression_expect: silent
+
+  - rule: P9
+    fires: "Line numbers corrected from the original submission."
+    suppressed: "Every line reference resolves against the pinned commit."
+
+  - rule: P8
+    fires: "This might be considered out of scope, and arguably the impact is critical."
+    suppressed: "The impact is a 100 percent loss of the depositor principal, demonstrated below."
+    # REPRODUCED: the rule fired on the standard heading "Severity rationale",
+    # which meant every well-structured report tripped it.
+    regression: "# Finding\n\n## Severity rationale\n\nThe attacker extracts the full balance in one transaction.\n"
+    regression_expect: silent
+
+  - rule: P10
+    fires: "| TVL | Attacker Profit |\n| 10M | 50K |\nThis extrapolates to every pool at scale this would be catastrophic."
+    suppressed: "The PoC demonstrated a 5.03 unit profit on a 100 unit deposit."
+
+  - rule: P14
+    fires: "Payment Assessment: likely payment 50-60 percent, likely reward 1K-5K."
+    suppressed: "The impact is quantified below with the measured delta."
+
+  - rule: P17
+    fires: "This is a griefing vector with no fund loss and no attacker profit."
+    suppressed: "The attacker profits 8.9253 USDC and a third party loses their deposit."
+
+  - rule: P19
+    # The headline claims total loss, the proof shows only a revert, and nothing
+    # asserts persisted state: the proof disproves the title. Structural.
+    fires: "# Permanent fund lock in the validator\n\nThe headline claims a total loss of funds.\n\n## Proof of concept\n\nThe transaction reverts and all state is rolled back.\n"
+    suppressed: "# Revert-only robustness note\n\n## Proof of concept\n\nThe call reverts for the caller and no state change persists.\n"
+    # REPRODUCED: the old form fired on co-occurrence alone, so a VALID
+    # revert-based freeze - one that asserts a persisted consequence - was killed.
+    regression: "# Permanent fund lock in the validator\n\nThe headline claims a total loss of funds.\n\n## Proof of concept\n\nThe call reverts for the attacker, but the committed storage slot keeps the funds stranded after the call returns.\n"
+    regression_expect: fires
+    regression_verdict: warn

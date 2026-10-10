@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Calibration and limitations
+    url: https://github.com/KhomDev/viability-gate/blob/main/docs/calibration.md
+    about: What has been measured, what has not, and why the false-positive rate is unmeasured.
+  - name: Security policy
+    url: https://github.com/KhomDev/viability-gate/blob/main/SECURITY.md
+    about: How to report a security issue, and what counts as one in an offline tool.

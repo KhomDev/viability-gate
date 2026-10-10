@@ -1,0 +1,67 @@
+# cargo-deny configuration.
+#
+# The dependency graph is deliberately tiny: five direct crates, 39 packages
+# total. Every addition is a supply-chain decision, so the checks here are strict
+# rather than advisory.
+
+[graph]
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "aarch64-unknown-linux-gnu" },
+    { triple = "x86_64-apple-darwin" },
+    { triple = "aarch64-apple-darwin" },
+    { triple = "x86_64-pc-windows-msvc" },
+]
+
+[advisories]
+version = 2
+ignore = []
+# Deny on any advisory with a known fix. An advisory with no fix is reported but
+# does not block, because blocking on it would mean blocking on upstream.
+yanked = "deny"
+
+[licenses]
+version = 2
+# Everything in the graph resolves to one of these. If a new dependency arrives
+# under a different licence, that is a decision to make explicitly.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+# The no-network property is a hard guarantee, not a preference. See
+# docs/no-network.md. This list is the manifest-level half of the check; CI also
+# greps the resolved graph, because a transitive arrival is the likelier route.
+deny = [
+    { name = "reqwest" },
+    { name = "hyper" },
+    { name = "ureq" },
+    { name = "curl" },
+    { name = "isahc" },
+    { name = "surf" },
+    { name = "attohttpc" },
+    { name = "tokio" },
+    { name = "async-std" },
+    { name = "native-tls" },
+    { name = "rustls" },
+    { name = "openssl" },
+    { name = "tungstenite" },
+]
+skip = []
+skip-tree = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

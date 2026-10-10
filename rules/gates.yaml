@@ -1,0 +1,239 @@
+# The pre-hunt gates - ONE SOURCE OF TRUTH.
+#
+# Run these against a TARGET and PROGRAM before hunting. Each gate declares what
+# input it needs; when that input is missing the gate reports '?' (unknown),
+# never a tick. Unknown is not pass.
+#
+# This file is DATA. No gate names a target, chain, ecosystem or program.
+#
+# Schema per gate:
+#   id          - stable identifier
+#   title       - one line
+#   question    - what the gate asks
+#   needs       - the input required to run it (CLI flag in brackets)
+#   blocks      - what a failure prevents
+#   weight      - how much a failure would subtract if weights were applied
+#   evidence    - in_sample | none. Whether the author's log has rows behind it.
+#   origin_rows - how many rows. 0 = not measured.
+#   checks      - optional mechanical checks applied to the supplied input
+#
+# GATE VOCABULARY (the ids are shared with rejection-taxonomy; no id may mean two
+# things across the two repositories):
+#
+#   G1  severity floor
+#   G2  exclusions
+#   G3  scope tree
+#   G4  prior audits
+#   G5  test intent
+#   G6  fork novelty
+#   G7  own history
+#   D1  known-issues / duplicate
+#
+# D1 is implemented by --known-issues rather than as a gate object, because its
+# input is a corpus rather than a check over the target. The id is still declared
+# below (with a null input contract) so the vocabulary is complete and
+# rejection-taxonomy can assert that the two repositories agree on it.
+#
+# HONESTY NOTE ON EVIDENCE: the counts below are rows of the author's own
+# rejection log that the gate is derived from. They are NOT a validated detection
+# rate, and they are in-sample. G6 has no supporting rows at all, and says so.
+
+version: 1
+
+gates:
+  - id: G1
+    title: Severity floor
+    question: Is there a payout tier at the severity I can plausibly reach?
+    needs: "the program's reward table [--ledger]"
+    blocks: >-
+      Hunting at all. A Medium-class mechanism on a Critical-only program has an
+      expected value of zero, however correct it is.
+    weight: 40
+    evidence: in_sample
+    origin_rows: 5
+    checks:
+      - name: floor_declared
+        test: ledger entry must declare tier_shape
+        fail: "tier_shape is missing - the floor has not been transcribed"
+      - name: floor_status_declared
+        test: floor_status must be documented, unstated or conflicting
+        fail: >-
+          floor_status is missing. An unstated floor is not a Low floor: it is a
+          page that has not been read.
+      - name: floor_known
+        test: tier_shape must not be 'unknown'
+        fail: >-
+          tier_shape is 'unknown'. This is NOT permissive - it means the page has
+          not been read. Hunting an untranscribed program is an unhedged bet.
+      - name: floor_reachable
+        test: if tier_shape is critical_only or high_and_above, a Critical/High thesis is required
+        fail: >-
+          tier_shape is narrow. Confirm your thesis can reach it before hunting.
+
+  - id: G2
+    title: Exclusion clauses
+    question: Does a written exclusion clause cover my bug class?
+    needs: "the program's out-of-scope clauses [--ledger]"
+    blocks: >-
+      The second-largest rejection category. Of 26 out-of-scope rejections in the
+      source data, privileged-role exclusions were the largest single sub-cause.
+    weight: 35
+    evidence: in_sample
+    origin_rows: 20
+    checks:
+      - name: exclusions_present
+        test: ledger entry must list at least one exclusion clause
+        fail: "no exclusion clauses transcribed - this is the cheapest gate to run"
+      - name: clauses_verbatim
+        test: every exclusion must carry a verbatim clause string
+        fail: "an exclusion clause is missing its verbatim text"
+      - name: patterns_compile
+        test: every exclusion pattern must be a valid regex
+        fail: "an exclusion pattern is not a valid regex"
+
+  - id: G3
+    title: Scope tree
+    question: Is the root cause inside the scoped files?
+    needs: "the in-scope file list [--scope]"
+    blocks: >-
+      Submitting a real bug whose root cause lives outside the scoped tree - a
+      deploy script, a test utility, an off-chain component.
+    weight: 30
+    evidence: in_sample
+    origin_rows: 4
+    checks:
+      - name: scope_supplied
+        test: a scope file list must be provided
+        fail: "no scope tree supplied - gate reports unknown, not pass"
+      - name: scope_nonempty
+        test: the scope list must contain at least one entry
+        fail: "the scope list is empty"
+
+  - id: G4
+    title: Prior audits
+    question: Is this surface already closed?
+    needs: "prior-audit links or local copies [--prior-audits]"
+    blocks: >-
+      Submitting a known design characteristic as a new finding. A prior audit
+      naming a file is not the same as covering your function.
+    weight: 30
+    evidence: in_sample
+    origin_rows: 7
+    checks:
+      - name: audits_supplied
+        test: prior-audit input must be provided
+        fail: "no prior-audit surface supplied - gate reports unknown, not pass"
+      - name: audits_listed
+        test: ledger entry should record prior_audits with a covers list
+        fail: >-
+          a prior audit is recorded without a 'covers' list. Read the finding, not
+          the table of contents.
+
+  - id: G5
+    title: Test-suite intent
+    question: Does the project's own test suite assert this behaviour is intended?
+    needs: "the target's test suite [--tests]"
+    blocks: >-
+      A finding the protocol's own tests validate as correct. This is Not
+      Applicable, not Informational - a materially worse outcome.
+    weight: 25
+    evidence: in_sample
+    origin_rows: 1
+    checks:
+      - name: tests_supplied
+        test: a test-suite path must be provided
+        fail: "no test suite supplied - gate reports unknown, not pass"
+      - name: intent_markers
+        test: grep the suite for intent markers
+        fail: >-
+          the test suite contains intent markers ("by design", "should preserve",
+          "intended"). Read the test before submitting.
+
+  - id: G6
+    title: Fork novelty
+    question: Is this a fork whose behaviour is documented upstream?
+    needs: "target provenance [--fork-of]"
+    blocks: >-
+      Reporting behaviour that exists identically upstream and is documented there
+      as intended. Verbatim forks inherit documented design decisions too.
+    weight: 20
+    # NO SUPPORTING ROWS. The author's log contains no rejection attributed to
+    # fork provenance. The gate is kept because it is cheap and the failure mode
+    # is real, but it is a judgement, not a measurement, and it says so.
+    evidence: none
+    origin_rows: 0
+    checks:
+      - name: fork_declared
+        test: whether the target is a fork must be stated
+        fail: "fork status unknown - gate reports unknown, not pass"
+
+  - id: G7
+    title: Own submission history
+    question: Have I already submitted this bug family?
+    needs: "your own submission log [--log]"
+    blocks: >-
+      Re-filing a bug family you already submitted. This is the one failure mode
+      no text pattern over a draft finding can catch, because the signal is in
+      your own history rather than in the report.
+    weight: 30
+    evidence: in_sample
+    origin_rows: 12
+    checks:
+      - name: log_supplied
+        test: a history log must be supplied
+        fail: >-
+          no own-history log supplied. Gate reports unknown, not pass. Run
+          'vg init' to scaffold one, or 'vg log add' to record a submission.
+      - name: log_nonempty
+        test: the log must contain at least one submission
+        fail: "the own-history log is empty - nothing to compare against"
+      - name: no_probable_repeat
+        test: >-
+          deterministic token-overlap (Jaccard >= 0.18) between the draft and any
+          logged family
+        fail: >-
+          probable repeat of an earlier family. Read the earlier outcome before
+          submitting.
+
+  # D1 is not run by `vg gates`. It is a corpus match driven by
+  # --known-issues, and it is declared here so that the gate vocabulary in this
+  # repository and the earliest_gate vocabulary in rejection-taxonomy are the
+  # same set of ids. A consumer can assert that agreement mechanically.
+  #
+  # WHY IT IS NOT A GATE OBJECT: a gate answers a question about the TARGET from
+  # an input you supply about the target. D1 answers a question about your
+  # FINDING against a corpus you transcribed, so its "input" is the finding
+  # itself and its check is the matcher. Modelling it as a gate would mean
+  # inventing a target-side input it does not have.
+  #
+  # HONEST STATUS: an untested mechanism. Recall was 11-14% at 40-50% cross-fire
+  # in the author's own test, and it CANNOT catch a concurrent duplicate, which
+  # by definition is not in any corpus yet. See docs/calibration.md.
+  - id: D1
+    title: Known-issues / duplicate
+    question: Is this already in the program's known-issues list or its prior audits?
+    needs: "a known-issues corpus [--known-issues]"
+    blocks: >-
+      Submitting something the team already knows about. This is the largest
+      single rejection category, and it is the one no pattern over the finding's
+      own prose can find, because the signal lives in an external corpus.
+    weight: 0
+    implemented_by: "--known-issues"
+    run_by_gates_command: false
+    # 34 rows recorded D1 as the earliest catchable gate, the largest bucket in
+    # the log. That is a count of rejections, NOT a measure of this matcher: the
+    # matcher itself is unvalidated.
+    evidence: in_sample
+    origin_rows: 34
+    checks:
+      - name: corpus_supplied
+        test: a known-issues corpus must be supplied
+        fail: >-
+          no corpus supplied. D1 cannot run against the finding alone; the signal
+          is in the program's own list, which you have to transcribe.
+      - name: patterns_present
+        test: every entry must carry at least one pattern
+        fail: "an entry has no patterns, so it can never match"
+      - name: patterns_compile
+        test: every pattern must be a valid regex
+        fail: "a pattern is not a valid regex"

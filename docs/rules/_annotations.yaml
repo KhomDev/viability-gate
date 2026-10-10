@@ -1,0 +1,754 @@
+# Authored prose for the generated rule pages.
+#
+# scripts/gen_rule_docs.py merges this file with rules/anti-patterns.yaml and
+# writes docs/rules/P1.md .. P22.md. The mechanical fields (id, title, group,
+# verdict, weight, patterns, fix) come from the catalog so they cannot drift;
+# everything here is judgement that the catalog has no field for.
+#
+# Schema per rule:
+#   intent          — what the anti-pattern is, in one paragraph
+#   signals_note    — how to read the detection signals, and what they miss
+#   escape_hatches  — what suppresses the rule and why; "none" if there are none
+#   false_positives — known modes where the rule fires on something it should not
+#   examples        — one synthetic finding that fires, one that does not
+#   changelog       — dated entries; the catalog's git history is the authority
+#
+# Nothing here names a target, a program or a chain. The examples are synthetic
+# and describe no real report.
+
+version: 1
+
+rules:
+  P1:
+    intent: >-
+      The report says, in its own words, that the bug does not work yet. This is
+      the most expensive shape of rejection because the work is already done: the
+      PoC exists, the write-up exists, and the impact is framed in the future
+      tense.
+    signals_note: >-
+      The signals are hedging phrases, not technical facts. They fire on the
+      report's own admission ("not currently exploitable", "no current attack
+      path") and on conditional framing ("if the protocol were to upgrade"). A
+      report that describes a live exploit in plain language will not match.
+      A bare hedge is not an admission, so the rule separates the two: only the
+      forms that explicitly say no impact exists today raise it to a hard fail.
+    escape_hatches: >-
+      None - there is no suppression list, because no positive signal turns an
+      admitted non-exploit into an exploit. What the rule has instead is an
+      ESCALATION list: the explicit admissions raise it to a hard fail, while a
+      bare hedge such as "hypothetical" leaves it as a note. The word
+      "hypothetical" alone used to be a hard fail, which is the single most
+      common word in a report that is merely being careful.
+    false_positives:
+      - A report that quotes the *program's* denial and then refutes it. The
+        quoted denial matches, and the refutation does not suppress the rule.
+      - Security-review language that is conditional by convention, such as
+        "if an attacker could control the input", where the precondition is
+        stated as a hypothetical but is in fact reachable. It fires as a note
+        rather than a hard fail, which is the intended behaviour and still a
+        prompt to check the wording.
+      - A finding about a live issue that mentions a hypothetical as a secondary
+        observation.
+    examples:
+      fires: >-
+        "This is not currently exploitable, but the pattern is dangerous and
+        should be fixed before the next upgrade."
+      does_not_fire: >-
+        "An unprivileged attacker drains the vault in a single transaction; the
+        PoC below asserts the balance delta."
+    changelog:
+      - date: 2026-10-10
+        note: >-
+          Split the hard fail from the hedge. A bare "hypothetical" is the most
+          common word in a report that is merely being careful, so it now fires
+          as a note; only the explicit admissions escalate to a hard fail.
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P6:
+    intent: >-
+      The finding is filed at a severity that only becomes true after a change
+      nobody has scheduled. The mechanism is real; the impact is a prediction.
+    signals_note: >-
+      Signals are phrases that locate the harm in a future version ("if a future
+      upgrade", "once the team migrates") or that admit the current protection is
+      accidental ("current protection is incidental", "fragile coupling").
+    escape_hatches: >-
+      None. A rule about speculative framing cannot be suppressed by better
+      framing; the fix is to file at the severity the current state supports.
+    false_positives:
+      - A finding whose current impact is genuinely High and which mentions an
+        upgrade only as an aggravating note.
+      - Reports about a governance-controlled parameter where the change is
+        scheduled and public.
+      - A report that describes the *current* state as the fragile one and
+        quantifies today's impact.
+    examples:
+      fires: >-
+        "If a future upgrade removes the guard, this becomes Critical."
+      does_not_fire: >-
+        "The guard is absent today and the attacker profits today, as the PoC
+        demonstrates."
+    changelog:
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P12:
+    intent: >-
+      The whole demonstrated impact is an aborted call. A revert that rolls the
+      state back leaves nothing behind: no attacker gain, no persisted loss, no
+      accounting delta. Reverting is the EVM's default failure mode, not a
+      vulnerability.
+    signals_note: >-
+      This rule needs two matches: an abort signal (revert, panic, assertion
+      failure, division by zero, or an ecosystem's expected-failure test marker)
+      AND a "no persisted impact" signal. Requiring both is what keeps it from
+      firing on every finding that happens to contain the word "revert".
+    escape_hatches: >-
+      None, but the conjunction is the escape: a finding that names a state
+      mutation that survives the revert does not satisfy `any_of`.
+    false_positives:
+      - A panic inside a callback where the caller's state has already been
+        committed. The word "revert" is present and the mutation is real.
+      - A report that says "read-only" about one path while the exploit uses
+        another path in the same contract.
+      - Gas-only or liveness-only findings that are nevertheless in scope for a
+        program that pays for denial of service.
+    examples:
+      fires: >-
+        "The transaction reverts. Direct fund loss: None. The function is
+        read-only."
+      does_not_fire: >-
+        "The panic skips the fee accrual, permanently under-crediting the next
+        depositor."
+    changelog:
+      - date: 2026-10-10
+        note: >-
+          The abort signal no longer names an ecosystem's expected-failure test
+          marker. Ecosystem test markers live in rules/packs/ and are never
+          inlined in the embedded catalog, so that a rule's presence reveals
+          nothing about which ecosystems the author works on.
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P13:
+    intent: >-
+      The report asserts that state is inconsistent, drifted, or out of order
+      without saying what that costs. An invariant violation with no quantified
+      delta is an observation, not an impact.
+    signals_note: >-
+      Signals are abstract-damage nouns: "inconsistent state", "accounting
+      drift", "state desync", "violates the invariant". The rule is suppressed
+      when the finding also carries a number attached to a unit — which is
+      exactly the evidence the triager wants.
+    escape_hatches: >-
+      Five suppression patterns, all numeric and all ecosystem-neutral: a
+      "loss/delta/difference of <number>" phrase, a dollar figure, a number with
+      a generic unit (tokens, base units, wei, shares), a precise decimal
+      figure, or a number followed by a ticker-shaped symbol. Any one of them
+      means the delta was quantified, which is the evidence the rule is asking
+      for. They name no chain and no token, because naming one would leak which
+      ecosystems the author works on.
+    false_positives:
+      - A finding that quantifies the delta in a table the suppression patterns
+        do not recognise (for example a percentage with no unit).
+      - A report where the quantified amount is in a linked PoC rather than in
+        the prose.
+      - A finding whose impact is genuinely non-financial, such as permanent
+        liveness loss, and which therefore has no token amount to quote.
+    examples:
+      fires: >-
+        "This creates inconsistent state and violates the accounting invariant."
+      does_not_fire: >-
+        "The accounting drift lets the attacker extract 8.925300 USDC per cycle."
+    changelog:
+      - date: 2026-10-10
+        note: >-
+          Suppression patterns made ecosystem-neutral: a number with a generic
+          unit, a precise decimal, or a ticker-shaped symbol. Naming specific
+          chains or tokens here would leak which ecosystems the author works on.
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P2:
+    intent: >-
+      Reaching the bug requires a role the program has written out of scope:
+      owner, admin, operator, guardian, governor. Most programs exclude
+      privileged-role findings in almost these words.
+    signals_note: >-
+      Signals name the role and the capability ("admin can", "onlyOwner",
+      "requires a privileged signer"). The rule is about the precondition, not
+      the impact — a severe impact reached only by an admin is still
+      privileged-role-gated.
+    escape_hatches: >-
+      Four suppression patterns, all of which are evidence that an unprivileged
+      path exists: demonstrated unprivileged escalation, "any user can
+      trigger", "permissionless", or "without any privileged role". They are
+      scoped to the SENTENCE, not the document: a "permissionless" in an
+      unrelated sentence must not switch the rule off, because the escape hatch
+      has to apply to the same sentence that named the privileged role.
+    false_positives:
+      - The unknowing-admin case — a reasonable admin action with a non-obvious
+        destructive second-order effect. The report mentions the admin and is
+        suppressed only if it also argues unprivileged reach.
+      - A finding where the role is required to *deploy* but not to *exploit*.
+      - A report about a compromised key, where the role is a consequence of the
+        compromise rather than a precondition of the bug.
+    examples:
+      fires: >-
+        "An admin can set the fee to 100% and brick liquidations."
+      does_not_fire: >-
+        "Any caller can invoke this; unprivileged escalation is demonstrated."
+    changelog:
+      - date: 2026-10-10
+        note: >-
+          Suppression is now sentence-scoped and requires evidence that an
+          unprivileged path exists. A "permissionless" in an unrelated sentence
+          used to switch the rule off, which is exactly backwards.
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P3:
+    intent: >-
+      The attack only works if the attacker wins a race or if the operator fails
+      to act. Front-running and delay dependencies are excluded by most
+      programs, because the finding describes a competition rather than a bug.
+    signals_note: >-
+      Signals are timing words: front-run, mempool, sandwich, race against,
+      "before the operator calls".
+    escape_hatches: >-
+      Three suppression patterns, all atomicity: an atomic single-transaction
+      path, a flash loan, or "same transaction". Atomicity removes the race,
+      which is the whole reason the exclusion applied.
+    false_positives:
+      - A finding that is atomic but describes the atomic path in a way the
+        patterns do not phrase as one transaction.
+      - A private-mempool or builder scenario where front-running is not
+        available to an outsider but the ordering bug is still real.
+      - A report where "front-run" appears in a mitigation note rather than in
+        the attack path.
+    examples:
+      fires: >-
+        "The attacker front-runs the operator's update call."
+      does_not_fire: >-
+        "The attack is atomic in one transaction via a flash loan."
+    changelog:
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P5:
+    intent: >-
+      The root cause lives outside the scoped tree: a deploy script, a test
+      utility, a mock, an off-chain component. Programs scope by root cause, so
+      a real impact reached from an out-of-scope file is still out of scope.
+    signals_note: >-
+      The signals are statements, not paths: that the code is outside the scope
+      or sources, off-chain, or not in the in-scope list, or that the root cause
+      sits outside the tree. The rule deliberately does not match file paths at
+      all any more - a path match inside the report's own PoC section is the
+      PoC's scaffolding, not the finding's root cause, and the old form killed a
+      report for citing its own test file. The PoC section is skipped.
+    escape_hatches: >-
+      None. Scope is a fact about the program, and no phrasing in the finding
+      changes where the root cause lives.
+    false_positives:
+      - A finding that describes its own reproduction harness as living outside
+        the scoped tree while the root cause is inside it. The PoC section is
+        skipped, but a harness mentioned in the impact section is not.
+      - A report that quotes the program's scope wording ("outside the scope of
+        this review") while arguing its own case is in scope.
+      - A finding whose root cause is in scope but which describes a helper
+        contract deployed separately as off-chain.
+    examples:
+      fires: >-
+        "The root cause is in the deployment script, outside the scope tree."
+      does_not_fire: >-
+        "The root cause is in the in-scope contract at the pinned commit; the
+        script only reproduces it."
+    changelog:
+      - date: 2026-10-10
+        note: >-
+          File-path matching removed and the PoC section skipped. The old form
+          killed a report for citing its own test file, which is the PoC's
+          scaffolding rather than the finding's root cause.
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P11:
+    intent: >-
+      The bug reproduces on a test network and not on the deployment that pays.
+      Testnet-only findings are filed at Critical because the testnet PoC is
+      convincing, and rejected because the deployed code differs.
+    signals_note: >-
+      Signals say the reproduction was testnet-only, or that mainnet is
+      unaffected or behaves differently.
+    escape_hatches: >-
+      None. Either the deployed configuration is affected or it is not.
+    false_positives:
+      - A finding verified on a mainnet fork, where the report says "testnet" to
+        describe the RPC endpoint used.
+      - A finding about a contract that is genuinely deployed on a test network
+        and pays under that program's rules.
+      - A report that states mainnet impact separately and is flagged on a
+        passing mention of the testnet.
+    examples:
+      fires: >-
+        "Reproduced on testnet only; mainnet is unaffected."
+      does_not_fire: >-
+        "Verified against the live mainnet deployment at the pinned block."
+    changelog:
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P20:
+    intent: >-
+      The full impact needs a second party to act: a cooperating LP, a victim
+      who must call a function, a governance vote that must pass. Solo
+      triggerability is the line between a bug and a story.
+    signals_note: >-
+      Signals name the cooperating party and what they must do ("requires the
+      victim to cooperate", "if the LP exits mid-cycle", "a governance proposal
+      must pass").
+    escape_hatches: >-
+      None. The rule is about who acts, and no phrasing makes a second party
+      unnecessary.
+    false_positives:
+      - A finding where the second party acts *rationally and predictably* in
+        response to the attacker's action, so the attacker can force it.
+      - A report that describes a governance-mediated fix rather than a
+        governance-mediated precondition.
+      - A finding where the "cooperating" party is the attacker's own second
+        account.
+    examples:
+      fires: >-
+        "Exploitation requires a cooperating LP to exit during the flash loan."
+      does_not_fire: >-
+        "One unprivileged attacker acting alone triggers the full impact."
+    changelog:
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P7:
+    intent: >-
+      The finding is that the code deviates from a convention, not that the
+      deviation loses money. Best-practice critiques are excluded by most
+      programs in almost these words.
+    signals_note: >-
+      Signals are convention nouns and improvement verbs: best practice,
+      industry standard, style or gas suggestion, "deviates from".
+    escape_hatches: >-
+      None. The rule is about the *claim*, and the fix is to attach a fund-loss
+      consequence to the specific deviation.
+    false_positives:
+      - A finding that states the convention and then demonstrates a concrete
+        loss, where the rule fires on the framing sentence.
+      - A report quoting a program's own guidance as a requirement rather than
+        as a convention.
+      - A finding about a deviation that is also a security boundary, described
+        with the word "standard".
+    examples:
+      fires: >-
+        "The canonical implementation uses a different comparison, so this
+        deviation from best practice should be fixed."
+      does_not_fire: >-
+        "The strict comparison lets the attacker extract funds after expiry."
+    changelog:
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P16:
+    intent: >-
+      The mechanics are confirmed and the program does not pay for that
+      severity. This is the most expensive rejection per row, because the work
+      was correct and the reward was zero.
+    signals_note: >-
+      Signals describe the program's reward structure rather than the bug:
+      below the floor, critical-only, no medium payout tier.
+    escape_hatches: >-
+      None. This is a fact about the program's table, and the fix is to route the
+      finding to a program that pays for it.
+    false_positives:
+      - A finding that *describes* the floor while arguing it reaches above it.
+      - A report that mentions a tier while analysing a different program.
+      - A finding where the floor is quoted from a stale reward page.
+    examples:
+      fires: >-
+        "This is below the payout floor; the program is critical-only."
+      does_not_fire: >-
+        "The program pays Medium and above, and this reaches High."
+    changelog:
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P18:
+    intent: >-
+      The finding admits it is already in the public record: a prior audit, a
+      documented design decision, a known issue. Submitting it signals that the
+      prior audit was not read, which is worse than not submitting.
+    signals_note: >-
+      Signals are admission phrases: "previously reported", "already known",
+      "known issue", "documented as intended", or a named prior audit that
+      covered or accepted the surface. A bare mention of "prior audit" is
+      deliberately NOT a signal, because "the prior audit missed this" is the
+      opposite claim. The rule fires on the report's own words, which is why it
+      cannot find the *real* duplicate that the report does not mention.
+    escape_hatches: >-
+      Six suppression patterns, all negations: "no prior audit", "not covered by
+      a prior review", "no known", "not previously", "new since", "first audit
+      of". A negated statement is the opposite signal — it says the surface is
+      new — and without these the rule fired on exactly the findings it should
+      have passed.
+    false_positives:
+      - A report that cites a prior audit to distinguish its own finding from it,
+        where the distinguishing language is not one of the six negations.
+      - A finding about a *regression* that reintroduces a previously fixed
+        issue.
+      - A report that quotes the program's known-issues list in order to argue
+        the entry does not cover this case.
+    examples:
+      fires: >-
+        "This was already reported in a prior audit and accepted as intended."
+      does_not_fire: >-
+        "No prior audit covers this module; the surface is new since the last
+        review."
+    changelog:
+      - date: 2026-10-08
+        note: >-
+          Escape hatches for negated forms added before the first catalog
+          commit. The rule previously over-fired on findings whose whole point
+          was that the surface was new.
+      - date: 2026-10-10
+        note: >-
+          A bare "prior audit" removed as a signal. "The prior audit missed
+          this" is the opposite claim and the old rule hard-killed it; the
+          engine's negation window now applies on top of the explicit escape
+          hatches.
+
+  P21:
+    intent: >-
+      The bug is real at a configuration nobody runs. Post-mortem addition: it
+      catches findings that are mechanically correct and unreachable under the
+      deployed parameters.
+    signals_note: >-
+      Signals describe the mismatch between the analysis and the deployment:
+      "at the documented configuration", "assuming a non-default config", "if
+      the operator chooses".
+    escape_hatches: >-
+      None. The fix is to name a bound that is representative of the deployed
+      configuration, and that is a change to the analysis rather than to the
+      phrasing.
+    false_positives:
+      - A finding measured at a representative deployed bound that also
+        mentions a non-default configuration in a sensitivity note.
+      - A program whose deployed configuration is genuinely operator-set, so no
+        single "documented" configuration exists.
+      - A report about a parameter that is immutable in the deployed bytecode
+        but configurable in the source.
+    examples:
+      fires: >-
+        "At the documented configuration the margin is negative, so assume a
+        non-default config where it is positive."
+      does_not_fire: >-
+        "Measured at the deployed configuration with representative bounds."
+    changelog:
+      - date: 2026-09-28
+        note: "Added after the realism post-mortems, together with P22."
+
+  P22:
+    intent: >-
+      A primitive is unsafe in a composition that nobody has deployed. Post-
+      mortem addition: it separates "this building block can be misused" from
+      "this product can be attacked".
+    signals_note: >-
+      Signals describe the absence of a deployed consumer: "no deployed
+      instance", "the maker must choose to deploy this", "a design choice no
+      deployed strategy makes".
+    escape_hatches: >-
+      Three suppression patterns, each of which requires an ASSERTION that a
+      deployment exists. They are deliberately narrow: a bare "deployed
+      instance" would also match "no deployed instance exists", which is the
+      opposite signal. This escape hatch once suppressed its own positive case,
+      which is how the assertion requirement was found.
+    false_positives:
+      - A finding where the deployed consumer exists but the report describes it
+        in words the assertion patterns do not match.
+      - A finding about a primitive that the *program itself* deploys through a
+        factory, so the deployment is implicit.
+      - A report that names a deployed instance and is flagged on a separate
+        sentence about a hypothetical composition.
+    examples:
+      fires: >-
+        "The maker must choose to deploy this composition; no deployed instance
+        exists."
+      does_not_fire: >-
+        "The deployed instance at the documented strategy exhibits this
+        behaviour."
+    changelog:
+      - date: 2026-10-08
+        note: >-
+          The escape hatch previously suppressed this rule's own positive case.
+          The suppression patterns now require an explicit assertion that a
+          deployment exists.
+      - date: 2026-09-28
+        note: "Added after the realism post-mortems, together with P21."
+
+  P15:
+    intent: >-
+      The project's own tests assert the behaviour is correct. This is Not
+      Applicable rather than Informational — a materially worse outcome — because
+      it means the reporter did not read the tests.
+    signals_note: >-
+      Signals are intent phrases: by design, intended behaviour, "the test
+      asserts this", documented behaviour. The last two are the strongest.
+    escape_hatches: >-
+      Six suppression patterns, and they are the STRONGEST forms of the
+      argument: "contradicts the documented behaviour", "violates the
+      documented", "diverges from the documented", and their variants. A report
+      that says the implementation contradicts the documented behaviour is
+      arguing the docs are wrong, not hiding behind them, and the old rule
+      hard-failed it. A bare "documented behaviour" now fires as a NOTE; it
+      escalates to a hard fail only when the report points at the project's own
+      test asserting the behaviour.
+    false_positives:
+      - A report that says "by design" about a *different* component than the
+        one it is reporting.
+      - A test that asserts the behaviour only as an incidental setup step.
+      - A finding where the test asserts the *input* is valid rather than the
+        behaviour being intended.
+    examples:
+      fires: >-
+        "The behaviour is by design and the test suite validates it."
+      does_not_fire: >-
+        "No test covers this path; the branch is unreachable from any test."
+    changelog:
+      - date: 2026-10-10
+        note: >-
+          Suppression added for the strongest forms of the argument: a report
+          saying the implementation CONTRADICTS the documented behaviour is
+          arguing the docs are wrong, and the old rule hard-failed it. A bare
+          "documented behaviour" is now a note that escalates only when the
+          report points at the project's own test.
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P4:
+    intent: >-
+      The PoC does not prove the claim: a tautological assertion, a simulator or
+      mock instead of the real contract, or no failing assertion at all. The
+      finding may be true; the evidence is not evidence.
+    signals_note: >-
+      Signals are the tautology shapes (an assertion that a value is at least
+      zero, which no unsigned value can fail) and mock/simulator class names.
+      The default verdict is a NOTE, not a kill: naming a mock is ordinary PoC
+      scaffolding. It becomes a hard fail only when the report says the mock
+      stood in for the real thing, and ordinary scaffolding names are dropped
+      outright before the rule is even considered.
+    escape_hatches: >-
+      Two mechanisms rather than a suppression list. A DOWNGRADE list drops the
+      ordinary scaffolding names (a standard mock token, a stub class) before
+      the rule fires at all. An ESCALATION list raises the rule to a hard fail
+      when the report admits the mock stood in for the real contract. A
+      defective PoC is fixed by rewriting it, not by rewording the finding.
+    false_positives:
+      - A PoC that uses a mock for a *peripheral* dependency while exercising the
+        real in-scope contract.
+      - A finding whose PoC is a runnable script rather than a test, so the
+        assertion patterns do not apply.
+      - A report that quotes a mock's name while describing the target's own
+        interface.
+    examples:
+      fires: >-
+        "The PoC imports a MockVault and its only assertion is that a balance is
+        greater than or equal to zero."
+      does_not_fire: >-
+        "The PoC imports the real in-scope contract and asserts the delta."
+    changelog:
+      - date: 2026-10-10
+        note: >-
+          Default verdict is now a note rather than a kill, and ordinary
+          scaffolding names are dropped outright. Naming a mock is not evidence
+          that the PoC is defective; only an admission that the mock stood in
+          for the real contract escalates the rule.
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P9:
+    intent: >-
+      The report's own line numbers or paths are known-wrong. A wrong line
+      reference is a credibility failure that taints an otherwise correct
+      finding.
+    signals_note: >-
+      Signals are corrections and drift admissions: "line numbers corrected",
+      "originally referenced", "may have drifted".
+    escape_hatches: >-
+      None. The fix is to re-clone the scope commit and resolve every reference.
+    false_positives:
+      - A report that mentions a corrected line number while the final numbers
+        are correct.
+      - A finding about a moving branch where the commit is pinned and the line
+        numbers are correct for it.
+      - A report that quotes a diff hunk header.
+    examples:
+      fires: >-
+        "Line numbers corrected from the original submission."
+      does_not_fire: >-
+        "Every line reference resolves against the pinned commit."
+    changelog:
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P8:
+    intent: >-
+      The report argues with itself: the severity rationale hedges, the impact
+      section concedes the finding may be out of scope, the conclusion is
+      "arguably". Embedded doubt is read as an admission.
+    signals_note: >-
+      Signals are hedge words and self-undermining phrases: "might be
+      rejected", "could work by accident", "this may not qualify", "arguably".
+      "Severity rationale" is deliberately NOT a signal: it is the standard
+      heading of a well-structured report, and firing on it meant every
+      well-written submission tripped this rule.
+    escape_hatches: >-
+      None. The fix is to pick one impact scenario and delete the hedging.
+    false_positives:
+      - A report that states a limitation precisely in order to pre-empt a
+        triager's objection, without conceding the finding.
+      - A finding that describes a *range* of outcomes, which reads as hedging
+        but is quantification.
+      - A report that quotes the program's exclusion clause verbatim in order to
+        argue it does not apply.
+    examples:
+      fires: >-
+        "Severity Rationale: this might be considered out of scope, however the
+        impact is critical."
+      does_not_fire: >-
+        "The impact is a 100% loss of the depositor's principal, demonstrated
+        below."
+    changelog:
+      - date: 2026-10-10
+        note: >-
+          "Severity rationale" removed as a signal. It is the standard heading
+          of a well-structured report, and firing on it meant every
+          well-written submission tripped this rule.
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P10:
+    intent: >-
+      The report extrapolates impact to a TVL the PoC never tested. The triager
+      can multiply; the extrapolation only hurts credibility.
+    signals_note: >-
+      Signals are scaling tables and extrapolation words: a TVL column,
+      "extrapolated", "at scale this would be". A numeric TVL row is not a
+      signal on its own - it is a measurement - so the rule fires on the
+      extrapolation framing instead.
+    escape_hatches: >-
+      None.
+    false_positives:
+      - A report that includes a table of *measured* values at several deposit
+        sizes rather than extrapolated ones.
+      - A finding whose impact genuinely scales linearly and says so with the
+        measured constant.
+      - A table that quotes the program's own TVL for context.
+    examples:
+      fires: >-
+        "A table extrapolating attacker profit from a 10M TVL to a 500M TVL."
+      does_not_fire: >-
+        "The PoC demonstrated a 5.03 unit profit on a 100 unit deposit."
+    changelog:
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P14:
+    intent: >-
+      The report tells the triager what it expects to be paid. This either
+      anchors the assessment or signals gaming; neither helps.
+    signals_note: >-
+      Signals are payment-probability phrases: "payment assessment", "likely
+      reward", "estimated payout", "probability of acceptance".
+    escape_hatches: >-
+      None. Remove the section.
+    false_positives:
+      - A finding that quotes the program's published reward table to establish
+        severity.
+      - A report that discusses the *program's* payout history as context.
+      - A finding that quantifies the loss in currency, which is impact rather
+        than a payout prediction.
+    examples:
+      fires: >-
+        "Payment Assessment: likely payment 50-60%, likely reward $1K-$5K."
+      does_not_fire: >-
+        "The impact is quantified below with the measured delta."
+    changelog:
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P17:
+    intent: >-
+      Nobody wins. The bug harms the protocol, the caller, or nobody at all, and
+      there is no net-positive extraction for an attacker. This is the second
+      most common shape in the source log.
+    signals_note: >-
+      Signals are no-beneficiary phrases and self-harm shapes: "no fund loss",
+      "self-harm", "griefing", "denial of service", "no financial beneficiary".
+    escape_hatches: >-
+      Three suppression patterns, all of which quantify an attacker gain: "the
+      attacker profits <n>", "net gain of <n>", or "a third party loses". A
+      number attached to a beneficiary is the evidence that makes it a finding.
+    false_positives:
+      - A griefing finding that is nevertheless payable, where the program pays
+        for availability loss.
+      - A finding where the attacker's gain is a governance or positional
+        advantage that cannot be written as a number.
+      - A report that describes the absence of attacker profit in a *secondary*
+        scenario while the primary scenario has one.
+    examples:
+      fires: >-
+        "This is a griefing vector with no fund loss and no attacker profit."
+      does_not_fire: >-
+        "The attacker profits 8.9253 USDC and a third party loses their
+        deposit."
+    changelog:
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."
+
+  P19:
+    intent: >-
+      The title claims permanent, total, irreversible loss and the proof shows
+      only an aborted call. This is the SPAM boundary: the punishment is worse
+      than rejection, so the rule carries the heaviest weight in the catalog.
+    signals_note: >-
+      This rule is STRUCTURAL, not a phrase match: it needs a headline loss
+      claim, a proof section that shows only a revert, panic or expected
+      failure, and no assertion that anything persisted. All three together are
+      the contradiction. A report titled with permanent loss whose PoC
+      demonstrates stranded funds does not match, and a report that honestly
+      describes a revert-based freeze does not hard-fail - the claim and the
+      evidence disagree, so it fires as a note for a human to look at.
+    escape_hatches: >-
+      None, but the conjunction is narrow: a report titled with permanent loss
+      whose proof demonstrates persisted stranded funds does not match, and one
+      that asserts the persisted state explicitly suppresses the rule outright.
+    false_positives:
+      - A report titled with permanent loss where the PoC demonstrates a
+        persisted state change and *also* mentions a revert on a secondary path.
+      - A finding where the permanent loss is in the design and the revert is
+        the attacker's failed attempt.
+      - A report that uses "permanently" about a mitigation rather than the
+        impact.
+    examples:
+      fires: >-
+        "Titled 'permanent fund lock'; the body shows the transaction reverts
+        and state is rolled back."
+      does_not_fire: >-
+        "Titled 'permanent fund lock'; the body shows the stranded balance after
+        the call returns."
+    changelog:
+      - date: 2026-10-10
+        note: >-
+          Replaced co-occurrence with a structural matcher. The rule now needs a
+          headline claim, a proof section showing only an abort, and no
+          assertion of persisted state. A revert-based freeze described honestly
+          in all three parts fires as a note, not a kill.
+      - date: 2026-10-08
+        note: "Introduced with the first catalog commit."

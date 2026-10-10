@@ -1,0 +1,742 @@
+//! vg — score a draft audit finding against 22 documented rejection anti-patterns
+//! and 7 pre-hunt gates.
+//!
+//! Offline, deterministic, no API key. Ships rules, not data: no program names, no
+//! chains, no reward tables. Every target-specific input arrives at runtime.
+
+use crate::{bench, engine, init, model, render};
+
+use clap::{Parser, Subcommand};
+use engine::CompiledRule;
+use model::*;
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+
+/// Rules are embedded so the installed binary is self-contained; --rules points
+/// at a directory to override them.
+const EMBEDDED_ANTI_PATTERNS: &str = include_str!("../rules/anti-patterns.yaml");
+const EMBEDDED_GATES: &str = include_str!("../rules/gates.yaml");
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+const DISCLAIMER: &str = "Advisory, never authoritative. This tool produces an outcome \
+with reasons; it does not decide, and it cannot read your target's live rules. \
+Over-filtering is its own failure mode - the catalog is a prioritiser, not a \
+kill-switch. A triage rejection is not a final verdict. CLEAR means only that no \
+known blocker was found by this tool.";
+
+/// Default path for the local own-history log. Gitignored by design.
+pub const DEFAULT_LOG: &str = ".vg-history.yaml";
+
+#[derive(Parser)]
+#[command(
+    name = "vg",
+    version,
+    about = "Score a draft audit finding against documented rejection anti-patterns",
+    long_about = "Before you spend a day writing a PoC for something that cannot be paid, \
+                  run the finding through the catalog.\n\n\
+                  Ships rules, not data: no program names, no chains, no reward tables. \
+                  Target-specific input is supplied by you at runtime and never leaves \
+                  your machine.\n\n\
+                  NOTE ON THE NAME: vg is also the name of an unrelated bioinformatics \
+                  tool. This crate installs BOTH a vg and a viability-gate binary so you \
+                  can pick whichever does not collide on your PATH."
+)]
+struct Cli {
+    /// Directory holding anti-patterns.yaml and gates.yaml (default: embedded)
+    #[arg(long, global = true, value_name = "DIR")]
+    rules: Option<PathBuf>,
+
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Score a draft finding against the anti-pattern catalog
+    Check {
+        /// Path to the finding (markdown). Use - for stdin.
+        finding: String,
+
+        /// Machine-readable output
+        #[arg(long)]
+        json: bool,
+
+        /// Score threshold below which the outcome is HOLD (default 50).
+        /// The score is an uncalibrated heuristic, not a probability.
+        #[arg(long, default_value_t = 50)]
+        min_score: u32,
+
+        /// One row per rule, table format
+        #[arg(long)]
+        table: bool,
+
+        /// Exit non-zero when the outcome is KILL
+        #[arg(long)]
+        fail_on_kill: bool,
+
+        /// Your private program ledger (enables the pre-hunt gates)
+        #[arg(long)]
+        ledger: Option<PathBuf>,
+
+        /// In-scope file list, one path per line
+        #[arg(long)]
+        scope: Option<PathBuf>,
+
+        /// Prior-audit references, one per line
+        #[arg(long)]
+        prior_audits: Option<PathBuf>,
+
+        /// Path to the target's test suite (a directory or file)
+        #[arg(long)]
+        tests: Option<PathBuf>,
+
+        /// Upstream project this target forks, or "none"
+        #[arg(long)]
+        fork_of: Option<String>,
+
+        /// Known-issues corpus for this program (YAML). This is a KNOWN-ISSUE
+        /// MATCHER: it can only see what you transcribed, so it cannot catch a
+        /// concurrent duplicate.
+        #[arg(long)]
+        known_issues: Option<PathBuf>,
+
+        /// Your own submission history (YAML). Enables gate G7, which flags
+        /// probable repeats of a family you already submitted.
+        #[arg(long)]
+        log: Option<PathBuf>,
+    },
+
+    /// Run only the pre-hunt gates
+    Gates {
+        #[arg(long)]
+        ledger: Option<PathBuf>,
+        #[arg(long)]
+        scope: Option<PathBuf>,
+        #[arg(long)]
+        prior_audits: Option<PathBuf>,
+        #[arg(long)]
+        tests: Option<PathBuf>,
+        #[arg(long)]
+        fork_of: Option<String>,
+        #[arg(long)]
+        log: Option<PathBuf>,
+        /// A draft finding to compare against the own-history log (G7)
+        #[arg(long)]
+        finding: Option<PathBuf>,
+        #[arg(long)]
+        json: bool,
+        /// Show each gate's individual checks
+        #[arg(long)]
+        verbose: bool,
+    },
+
+    /// Explain one anti-pattern, with its detection patterns
+    Explain { id: String },
+
+    /// List the catalog
+    Rules,
+
+    /// Scaffold the input files a new target needs
+    Init {
+        /// Directory to write into (created if missing)
+        #[arg(default_value = "target")]
+        dir: PathBuf,
+        /// Overwrite existing files
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Manage your own submission history (gate G7)
+    Log {
+        #[command(subcommand)]
+        action: LogAction,
+    },
+
+    /// Measure the catalog against a labelled set of findings
+    Bench {
+        /// Directory of findings that were rejected
+        #[arg(long)]
+        rejected: PathBuf,
+        /// Directory of findings that were accepted or paid
+        #[arg(long)]
+        accepted: Option<PathBuf>,
+        /// CSV of labels: filename,label
+        #[arg(long)]
+        labels: Option<PathBuf>,
+        /// Emit machine-readable output
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum LogAction {
+    /// Record one submitted finding
+    Add {
+        /// The bug family label, as you write it
+        #[arg(long)]
+        family: String,
+        /// The outcome: paid | rejected | duplicate | oos | informational | pending
+        #[arg(long)]
+        outcome: String,
+        /// A free-text note
+        #[arg(long)]
+        note: Option<String>,
+        /// ISO date. Defaults to today.
+        #[arg(long)]
+        date: Option<String>,
+        /// The log file (default: .vg-history.yaml)
+        #[arg(long)]
+        file: Option<PathBuf>,
+    },
+    /// Check a draft finding against your own history
+    Check {
+        /// The draft finding to check
+        finding: PathBuf,
+        /// The log file (default: .vg-history.yaml)
+        #[arg(long)]
+        file: Option<PathBuf>,
+    },
+}
+
+pub fn main_entry() -> ExitCode {
+    let cli = Cli::parse();
+    match run(cli) {
+        Ok(code) => code,
+        Err(msg) => {
+            eprintln!("vg: {msg}");
+            ExitCode::from(2)
+        }
+    }
+}
+
+fn load_rules(dir: Option<&Path>) -> Result<(Vec<CompiledRule>, Vec<Gate>), String> {
+    let (ap_text, gate_text) = match dir {
+        Some(d) => {
+            let ap = std::fs::read_to_string(d.join("anti-patterns.yaml"))
+                .map_err(|e| format!("cannot read {}/anti-patterns.yaml: {e}", d.display()))?;
+            let g = std::fs::read_to_string(d.join("gates.yaml"))
+                .map_err(|e| format!("cannot read {}/gates.yaml: {e}", d.display()))?;
+            (ap, g)
+        }
+        None => (
+            EMBEDDED_ANTI_PATTERNS.to_string(),
+            EMBEDDED_GATES.to_string(),
+        ),
+    };
+
+    let parsed: RuleFile =
+        serde_yaml::from_str(&ap_text).map_err(|e| format!("anti-patterns.yaml: {e}"))?;
+    let gates: GateFile =
+        serde_yaml::from_str(&gate_text).map_err(|e| format!("gates.yaml: {e}"))?;
+
+    let compiled = parsed
+        .rules
+        .into_iter()
+        .map(CompiledRule::new)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    Ok((compiled, gates.gates))
+}
+
+fn read_text(path: &str) -> Result<String, String> {
+    if path == "-" {
+        use std::io::Read;
+        let mut buf = String::new();
+        std::io::stdin()
+            .read_to_string(&mut buf)
+            .map_err(|e| format!("stdin: {e}"))?;
+        return Ok(strip_bom(buf));
+    }
+    let text = std::fs::read_to_string(path).map_err(|e| format!("cannot read {path}: {e}"))?;
+    Ok(strip_bom(text))
+}
+
+/// Strip a UTF-8 BOM. Windows editors add one, and it corrupts the first
+/// evidence line in the report.
+fn strip_bom(s: String) -> String {
+    s.trim_start_matches('\u{feff}').to_string()
+}
+
+fn read_lines(path: &Option<PathBuf>) -> Result<Option<Vec<String>>, String> {
+    let Some(p) = path else { return Ok(None) };
+    let text =
+        std::fs::read_to_string(p).map_err(|e| format!("cannot read {}: {e}", p.display()))?;
+    let text = strip_bom(text);
+    Ok(Some(
+        text.lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .map(str::to_string)
+            .collect(),
+    ))
+}
+
+fn read_ledger(path: &Option<PathBuf>) -> Result<Option<Vec<LedgerEntry>>, String> {
+    let Some(p) = path else { return Ok(None) };
+    let text =
+        std::fs::read_to_string(p).map_err(|e| format!("cannot read {}: {e}", p.display()))?;
+    let text = strip_bom(text);
+    let entries: Vec<LedgerEntry> =
+        serde_yaml::from_str(&text).map_err(|e| format!("{}: {e}", p.display()))?;
+    Ok(Some(entries))
+}
+
+/// Load a known-issues corpus.
+///
+/// Accepts either a bare list or a mapping with a known_issues: key, so both
+/// shapes work. This is a KNOWN-ISSUE MATCHER: it can only see what the user
+/// transcribed, so it cannot catch a concurrent duplicate.
+fn read_known_issues(path: &Option<PathBuf>) -> Result<Option<Vec<KnownIssue>>, String> {
+    let Some(p) = path else { return Ok(None) };
+    let text =
+        std::fs::read_to_string(p).map_err(|e| format!("cannot read {}: {e}", p.display()))?;
+    let text = strip_bom(text);
+
+    if let Ok(list) = serde_yaml::from_str::<Vec<KnownIssue>>(&text) {
+        return Ok(Some(list));
+    }
+    #[derive(serde::Deserialize)]
+    struct Wrapper {
+        known_issues: Vec<KnownIssue>,
+    }
+    let w: Wrapper = serde_yaml::from_str(&text).map_err(|e| format!("{}: {e}", p.display()))?;
+    Ok(Some(w.known_issues))
+}
+
+/// Read the researcher's own submission history.
+///
+/// Accepts a bare list or a mapping with a submissions: key. An absent file means
+/// G7 reports Unknown, which is the fail-closed behaviour we want.
+fn read_log(path: &Option<PathBuf>) -> Result<Option<Vec<LogEntry>>, String> {
+    let Some(p) = path else { return Ok(None) };
+    if !p.exists() {
+        return Ok(None);
+    }
+    let text =
+        std::fs::read_to_string(p).map_err(|e| format!("cannot read {}: {e}", p.display()))?;
+    let text = strip_bom(text);
+    if let Ok(list) = serde_yaml::from_str::<Vec<LogEntry>>(&text) {
+        return Ok(Some(list));
+    }
+    #[derive(serde::Deserialize)]
+    struct Wrapper {
+        submissions: Vec<LogEntry>,
+    }
+    let w: Wrapper = serde_yaml::from_str(&text).map_err(|e| format!("{}: {e}", p.display()))?;
+    Ok(Some(w.submissions))
+}
+
+/// Read a test suite: a single file, or every file under a directory.
+fn read_tests(path: &Option<PathBuf>) -> Result<Option<String>, String> {
+    let Some(p) = path else { return Ok(None) };
+    if p.is_file() {
+        return Ok(Some(
+            std::fs::read_to_string(p).map_err(|e| format!("cannot read {}: {e}", p.display()))?,
+        ));
+    }
+    let mut combined = String::new();
+    let mut stack = vec![p.clone()];
+    let mut budget = 4_000_000usize; // cap total bytes read
+    while let Some(dir) = stack.pop() {
+        let rd = match std::fs::read_dir(&dir) {
+            Ok(rd) => rd,
+            Err(_) => continue,
+        };
+        for entry in rd.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if let Ok(text) = std::fs::read_to_string(&path) {
+                let take = text.len().min(budget);
+                combined.push_str(&text[..take]);
+                combined.push('\n');
+                budget = budget.saturating_sub(take);
+                if budget == 0 {
+                    break;
+                }
+            }
+        }
+    }
+    Ok(Some(combined))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_report(
+    subject: String,
+    text: &str,
+    rules: &[CompiledRule],
+    gates: &[Gate],
+    threshold: u32,
+    ledger: Option<&[LedgerEntry]>,
+    scope: Option<&[String]>,
+    prior: Option<&[String]>,
+    tests: Option<&str>,
+    fork_of: Option<&str>,
+    known: Option<&[KnownIssue]>,
+    own_log: Option<&[LogEntry]>,
+) -> Report {
+    let (mut findings, passed) = engine::evaluate(rules, text);
+
+    // Known-issue matches are merged in before the outcome is computed, because
+    // a known issue is a hard fail: it makes the finding Not Applicable rather
+    // than merely unpaid.
+    let mut ki_warnings: Vec<String> = Vec::new();
+    if let Some(issues) = known {
+        let (ki_findings, warnings) = engine::match_known_issues(issues, text);
+        ki_warnings = warnings;
+        findings.extend(ki_findings);
+    }
+    // Hard fails first, then by weight, so the worst problem reads first.
+    findings.sort_by(|a, b| {
+        let rank = |v: Verdict| match v {
+            Verdict::Hard => 0,
+            Verdict::Soft => 1,
+            Verdict::Warn => 2,
+        };
+        rank(a.verdict)
+            .cmp(&rank(b.verdict))
+            .then(b.weight.cmp(&a.weight))
+    });
+
+    let gate_outcomes = engine::evaluate_gates(
+        gates,
+        ledger,
+        scope,
+        prior,
+        tests,
+        fork_of,
+        own_log,
+        Some(text),
+    );
+    let gates_unknown = gate_outcomes
+        .iter()
+        .any(|g| g.status == GateStatus::Unknown);
+
+    let (outcome, viability_score) = engine::outcome(&findings, gates_unknown, threshold);
+    Report {
+        tool: "viability-gate".into(),
+        version: VERSION.into(),
+        subject,
+        outcome,
+        viability_score,
+        odds_deprecated: viability_score,
+        verdict_deprecated: outcome.word().to_string(),
+        deprecated_fields: vec!["odds".into(), "verdict".into()],
+        threshold,
+        findings,
+        passed,
+        gates: gate_outcomes,
+        disclaimer: DISCLAIMER.into(),
+        warnings: ki_warnings,
+    }
+}
+
+fn run(cli: Cli) -> Result<ExitCode, String> {
+    // init and log write local files and need no rules, so they run before the
+    // catalog is loaded - a user who has not yet read the docs should not hit a
+    // load error on their first command.
+    match &cli.command {
+        Command::Init { dir, force } => return Ok(init::run(dir, *force)),
+        Command::Log { action } => return Ok(run_log(action)),
+        _ => {}
+    }
+
+    let (rules, gates) = load_rules(cli.rules.as_deref())?;
+
+    match cli.command {
+        Command::Init { .. } | Command::Log { .. } => unreachable!("handled above"),
+
+        Command::Rules => {
+            let plain: Vec<Rule> = rules.into_iter().map(|c| c.rule).collect();
+            print!("{}", render::rules_list(&plain));
+            println!(
+                "\n  {} rules. Run 'vg explain <ID>' for detection patterns.",
+                plain.len()
+            );
+            Ok(ExitCode::SUCCESS)
+        }
+
+        Command::Explain { id } => {
+            let want = id.to_uppercase();
+            match rules.iter().find(|c| c.rule.id.to_uppercase() == want) {
+                Some(c) => {
+                    print!("{}", render::explain(&c.rule));
+                    Ok(ExitCode::SUCCESS)
+                }
+                None => Err(format!("no rule {id:?}. Run 'vg rules' for the catalog.")),
+            }
+        }
+
+        Command::Bench {
+            rejected,
+            accepted,
+            labels,
+            json,
+        } => {
+            let rejected_findings = read_findings_dir(&rejected)?;
+            let accepted_findings = match &accepted {
+                Some(d) => read_findings_dir(d)?,
+                None => Vec::new(),
+            };
+            let report = bench::run(
+                &rules,
+                &rejected_findings,
+                &accepted_findings,
+                labels.as_deref(),
+            )?;
+            if json {
+                println!("{}", bench::to_json(&report));
+            } else {
+                print!("{}", bench::to_text(&report));
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+
+        Command::Gates {
+            ledger,
+            scope,
+            prior_audits,
+            tests,
+            fork_of,
+            log,
+            finding,
+            json,
+            verbose,
+        } => {
+            let l = read_ledger(&ledger)?;
+            let s = read_lines(&scope)?;
+            let p = read_lines(&prior_audits)?;
+            let t = read_tests(&tests)?;
+            let history = read_log(&log)?;
+            let finding_text = match &finding {
+                Some(path) => Some(read_text(&path.display().to_string())?),
+                None => None,
+            };
+            let outcomes = engine::evaluate_gates(
+                &gates,
+                l.as_deref(),
+                s.as_deref(),
+                p.as_deref(),
+                t.as_deref(),
+                fork_of.as_deref(),
+                history.as_deref(),
+                finding_text.as_deref(),
+            );
+            if json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&outcomes).unwrap_or_default()
+                );
+            } else {
+                println!("pre-hunt gates\n");
+                print!("{}", render::gates_text(&outcomes, verbose));
+                let unknown = outcomes
+                    .iter()
+                    .filter(|o| o.status == GateStatus::Unknown)
+                    .count();
+                if unknown > 0 {
+                    println!(
+                        "\n  {unknown} gate(s) could not run. Unknown is not pass: \
+                         a gate you could not run is a gate you have not run."
+                    );
+                }
+            }
+            let failed = outcomes
+                .iter()
+                .any(|o| !o.status.is_pass() && o.status == GateStatus::Fail);
+            Ok(if failed {
+                ExitCode::from(1)
+            } else {
+                ExitCode::SUCCESS
+            })
+        }
+
+        Command::Check {
+            finding,
+            json,
+            min_score,
+            table,
+            fail_on_kill,
+            ledger,
+            scope,
+            prior_audits,
+            tests,
+            fork_of,
+            known_issues,
+            log,
+        } => {
+            let text = read_text(&finding)?;
+            if text.trim().is_empty() {
+                return Err(format!("{finding} is empty"));
+            }
+            let l = read_ledger(&ledger)?;
+            let s = read_lines(&scope)?;
+            let p = read_lines(&prior_audits)?;
+            let t = read_tests(&tests)?;
+            let ki = read_known_issues(&known_issues)?;
+            let history = read_log(&log)?;
+
+            let report = build_report(
+                finding.clone(),
+                &text,
+                &rules,
+                &gates,
+                min_score,
+                l.as_deref(),
+                s.as_deref(),
+                p.as_deref(),
+                t.as_deref(),
+                fork_of.as_deref(),
+                ki.as_deref(),
+                history.as_deref(),
+            );
+
+            if json {
+                println!("{}", render::json(&report));
+            } else if table {
+                println!("{:<5} {:<6} {:<4} TITLE", "STATE", "RULE", "WT");
+                for f in &report.findings {
+                    println!(
+                        "{:<5} {:<6} {:<4} {}",
+                        f.verdict.label(),
+                        f.rule,
+                        f.weight,
+                        f.title
+                    );
+                }
+                println!(
+                    "\noutcome {}  viability_score {} (uncalibrated heuristic)  threshold {}",
+                    report.outcome.word(),
+                    report.viability_score,
+                    report.threshold
+                );
+            } else {
+                print!("{}", render::text(&report));
+            }
+
+            let is_kill = report.outcome == Outcome::Kill;
+            Ok(if fail_on_kill && is_kill {
+                ExitCode::from(1)
+            } else {
+                ExitCode::SUCCESS
+            })
+        }
+    }
+}
+
+/// Read every markdown file under a directory, sorted by path so the benchmark
+/// is deterministic.
+fn read_findings_dir(dir: &Path) -> Result<Vec<(String, String)>, String> {
+    let mut out: Vec<(String, String)> = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        let rd = std::fs::read_dir(&d).map_err(|e| format!("cannot read {}: {e}", d.display()))?;
+        for entry in rd.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().and_then(|e| e.to_str()) == Some("md") {
+                let name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let text = std::fs::read_to_string(&path)
+                    .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+                out.push((name, text));
+            }
+        }
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(out)
+}
+
+fn log_path(file: &Option<PathBuf>) -> PathBuf {
+    file.clone().unwrap_or_else(|| PathBuf::from(DEFAULT_LOG))
+}
+
+fn run_log(action: &LogAction) -> ExitCode {
+    match action {
+        LogAction::Add {
+            family,
+            outcome,
+            note,
+            date,
+            file,
+        } => {
+            let path = log_path(file);
+            match init::log_add(&path, family, outcome, note.as_deref(), date.as_deref()) {
+                Ok(()) => {
+                    println!("recorded {family:?} in {}", path.display());
+                    println!(
+                        "\n  This file is LOCAL and gitignored. It contains your own bug \
+                         families and must never be published."
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("vg: {e}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        LogAction::Check { finding, file } => {
+            let path = log_path(file);
+            if !path.exists() {
+                eprintln!(
+                    "vg: no history log at {}. Run 'vg log add ...' first.",
+                    path.display()
+                );
+                return ExitCode::from(1);
+            }
+            let (_rules, gates) = match load_rules(None) {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("vg: {e}");
+                    return ExitCode::from(2);
+                }
+            };
+            let text = match read_text(&finding.display().to_string()) {
+                Ok(t) => t,
+                Err(e) => {
+                    eprintln!("vg: {e}");
+                    return ExitCode::from(2);
+                }
+            };
+            let history = match read_log(&Some(path.clone())) {
+                Ok(h) => h,
+                Err(e) => {
+                    eprintln!("vg: {e}");
+                    return ExitCode::from(2);
+                }
+            };
+            let outcomes = engine::evaluate_gates(
+                &gates,
+                None,
+                None,
+                None,
+                None,
+                None,
+                history.as_deref(),
+                Some(&text),
+            );
+            match outcomes.iter().find(|o| o.gate == "G7") {
+                Some(o) if o.status == GateStatus::Fail => {
+                    println!("REPEAT  {}", o.detail);
+                    ExitCode::from(1)
+                }
+                Some(o) => {
+                    println!("OK      {}", o.detail);
+                    ExitCode::SUCCESS
+                }
+                None => {
+                    println!("no G7 gate is defined in the catalog");
+                    ExitCode::SUCCESS
+                }
+            }
+        }
+    }
+}
