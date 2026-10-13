@@ -38,6 +38,11 @@ under "Changes since 0.2.0" further down.
   `docs/licensing.md` records the question as resolved.
 - **`docs/install.md` and the README** list `cargo install viability-gate` as the
   first install method.
+- **`deny.toml` ignores RUSTSEC-2024-0449** (`unsafe-libyaml` unmaintained,
+  pulled in by `serde_yaml` 0.9), with the reason recorded inline. The advisory
+  is about maintenance, not a known vulnerability. Replacing `serde_yaml` is
+  the next minor version's work, because a parser swap can change how the
+  catalog parses.
 
 ### Added
 
