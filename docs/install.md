@@ -20,9 +20,10 @@ cargo install --git https://github.com/KhomDev/viability-gate
 Every method installs **both** binaries, `vg` and `viability-gate`. They are the same
 program; see [the name collision](#the-vg-name-collision) below.
 
-Requires Rust 1.85 or newer (the MSRV is declared in `Cargo.toml` and checked in
-CI). The floor is 1.85 rather than the edition year because the dependency graph
-includes crates published under edition 2024, which older Cargo cannot even parse.
+Methods 1 and 2 compile from source and require **Rust 1.89 or newer**. The
+MSRV is declared in `Cargo.toml` and checked in CI. The floor is set by the
+YAML parser, `serde-saphyr`, which declares 1.89. It was 1.85 up to 0.3.0, when
+the parser was `serde_yaml`. A release binary (method 3) needs no Rust at all.
 
 To install from a local checkout instead:
 

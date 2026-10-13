@@ -25,7 +25,7 @@ fails if the README has drifted from it.
 <!-- BEGIN:example -->
 
 ```text
-viability-gate 0.3.0  —  finding.md
+viability-gate 0.4.0  —  finding.md
 
   OUTCOME   KILL
             A hard blocker fired. Do not submit as written.
@@ -414,8 +414,9 @@ cargo install --git https://github.com/KhomDev/viability-gate
 cargo install --path .
 ```
 
-Prebuilt binaries for linux, macos and windows are attached to each `v*` release tag, with SHA-256
-checksums and build attestations. See [docs/install.md](docs/install.md).
+Building from source needs Rust 1.89 or newer. Prebuilt binaries for linux, macos and windows,
+which need no Rust, are attached to each `v*` release tag, with SHA-256 checksums and build
+attestations. See [docs/install.md](docs/install.md).
 
 The rules are **embedded in the binary**, so the installed tool is self-contained and needs no
 data directory. Override them with `--rules <DIR>`.
@@ -515,7 +516,7 @@ Patterns are case-insensitive regexes unless the pattern itself says otherwise.
   exclusion clauses that make Gates 1 and 2 mechanical
 
 Pin to a tag, not to `main`:
-[viability-gate v0.3.0](https://github.com/KhomDev/viability-gate/tree/v0.3.0).
+[viability-gate v0.4.0](https://github.com/KhomDev/viability-gate/tree/v0.4.0).
 
 ## License
 

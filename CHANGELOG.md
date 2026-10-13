@@ -9,6 +9,32 @@ appears here only if it came from a command that can be re-run.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-13
+
+### Changed
+
+- **The YAML parser is now `serde-saphyr`** (pure Rust), replacing `serde_yaml`
+  0.9 and its `unsafe-libyaml`. Both are unmaintained (RUSTSEC-2024-0449), so
+  the `deny.toml` exception added in 0.3.0 is removed. The parse result is
+  unchanged. I checked this by diffing every output of the 0.3.0 binary against
+  0.4.0: `rules`, all 22 `explain` pages, `check --json` on every example
+  finding, a `check` and a `gates --verbose` run with a populated ledger,
+  known-issues corpus and history log, `bench`, and `init`. Apart from the
+  version string, they are identical.
+- **Breaking for source builds: the MSRV is now Rust 1.89** (was 1.85), because
+  `serde-saphyr` declares 1.89. Release binaries are unaffected.
+- **Malformed-YAML errors read differently.** They now come from the new
+  parser, with the line, the column and a caret pointing at the problem. Any
+  script that matched the old error text needs updating.
+- The dependency graph grows from 39 to 49 packages. None of them is a network
+  client (`docs/no-network.md`, re-verified).
+
+### Fixed
+
+- **`viability-gate --version` printed `vg 0.3.0`.** Each binary now reports
+  its own name in `--version`, `--help` and error prefixes. The library gains
+  `cli::main_entry_named`; `cli::main_entry` still exists and behaves as `vg`.
+
 ## [0.3.0] - 2026-10-13
 
 The first tagged release in this repository, and the first on crates.io. It
@@ -169,5 +195,6 @@ The tree itself is unchanged except for the two fixes recorded here.
 - The rule catalog and gate definitions as data, embedded in the binary.
 - The fixture suite: one positive and one negative case per anti-pattern.
 
-[Unreleased]: https://github.com/KhomDev/viability-gate/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/KhomDev/viability-gate/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/KhomDev/viability-gate/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/KhomDev/viability-gate/releases/tag/v0.3.0

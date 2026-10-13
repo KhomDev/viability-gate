@@ -17,23 +17,25 @@ data the user is trying to keep local. "We don't send it anywhere" is a promise;
 cargo tree --edges normal
 ```
 
-Every package in the graph, normal edges only, as of commit
-`2a26c75` (crate version 0.2.0):
+Every package in the graph, normal edges only, as of crate version 0.4.0:
 
 ```text
-aho-corasick       anstream           anstyle            anstyle-parse
-anstyle-query      anstyle-wincon     clap               clap_builder
-clap_derive        clap_lex           colorchoice        equivalent
-hashbrown          heck               indexmap           is_terminal_polyfill
-itoa               memchr             once_cell_polyfill proc-macro2
-quote              regex              regex-automata     regex-syntax
-ryu                serde              serde_core         serde_derive
-serde_json         serde_yaml         strsim             syn
-unicode-ident      unsafe-libyaml     utf8parse          viability-gate
-windows-link       windows-sys        zmij
+aho-corasick        annotate-snippets   anstream            anstyle
+anstyle-parse       anstyle-query       anstyle-wincon      arraydeque
+base64              cfg-if              clap                clap_builder
+clap_derive         clap_lex            colorchoice         core_detect
+encoding_rs         encoding_rs_io      granit-parser       heck
+is_terminal_polyfill itoa               memchr              multiversion_no_op
+nohash-hasher       num-traits          once_cell_polyfill  proc-macro2
+quote               regex               regex-automata      regex-syntax
+scopeguard          serde               serde-saphyr        serde_core
+serde_derive        serde_json          simdutf8            smallvec
+strsim              syn                 unicode-ident       unicode-width
+utf8parse           viability-gate      windows-link        windows-sys
+zmij
 ```
 
-39 packages. **None of them is a network client, and none of them pulls one
+49 packages. **None of them is a network client, and none of them pulls one
 transitively.** The five direct dependencies are:
 
 | Direct dependency | What it does | Network capability |
@@ -42,12 +44,17 @@ transitively.** The five direct dependencies are:
 | `regex` | Pattern matching | None |
 | `serde` | Derive macros for (de)serialisation | None |
 | `serde_json` | JSON output | None |
-| `serde_yaml` | Rule and ledger parsing | None |
+| `serde-saphyr` | Rule and ledger parsing (pure-Rust YAML) | None |
 
 The transitive set is entirely made of parser internals (`regex-automata`,
-`memchr`, `aho-corasick`), formatting (`itoa`, `ryu`), proc-macro plumbing
-(`syn`, `quote`, `proc-macro2`) and platform bindings (`windows-sys`,
+`memchr`, `aho-corasick`, `granit-parser`, `encoding_rs`), error rendering
+(`annotate-snippets`, `unicode-width`), formatting (`itoa`, `zmij`), proc-macro
+plumbing (`syn`, `quote`, `proc-macro2`) and platform bindings (`windows-sys`,
 `windows-link`, used by `anstream` for terminal colour detection).
+
+0.4.0 replaced `serde_yaml` 0.9 and its C-translated `unsafe-libyaml`, both
+unmaintained (RUSTSEC-2024-0449), with `serde-saphyr`. That raised the count from
+39 to 49 packages; none of the ten additions has network capability.
 
 **The denylist CI enforces** — if any of these ever appears in the graph, the
 build fails:

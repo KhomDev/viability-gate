@@ -4,5 +4,5 @@
 //! bioinformatics tool.
 
 fn main() -> std::process::ExitCode {
-    viability_gate::cli::main_entry()
+    viability_gate::cli::main_entry_named("viability-gate")
 }

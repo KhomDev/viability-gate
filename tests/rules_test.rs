@@ -37,7 +37,8 @@ struct Case {
 }
 
 fn compiled() -> Vec<CompiledRule> {
-    let parsed: RuleFile = serde_yaml::from_str(ANTI_PATTERNS).expect("anti-patterns.yaml parses");
+    let parsed: RuleFile =
+        serde_saphyr::from_str(ANTI_PATTERNS).expect("anti-patterns.yaml parses");
     parsed
         .rules
         .into_iter()
@@ -46,7 +47,7 @@ fn compiled() -> Vec<CompiledRule> {
 }
 
 fn load() -> (Vec<CompiledRule>, Vec<Case>) {
-    let fixtures: FixtureFile = serde_yaml::from_str(FIXTURES).expect("fixtures parse");
+    let fixtures: FixtureFile = serde_saphyr::from_str(FIXTURES).expect("fixtures parse");
     (compiled(), fixtures.cases)
 }
 
@@ -186,7 +187,7 @@ fn gates_are_eight_and_well_formed() {
     // G1..G7 plus D1. D1 is declared but not dispatched by `vg gates`; it is
     // driven by --known-issues. It is declared so the gate vocabulary here and
     // the earliest_gate vocabulary in rejection-taxonomy are the same id set.
-    let g: GateFile = serde_yaml::from_str(GATES).expect("gates.yaml parses");
+    let g: GateFile = serde_saphyr::from_str(GATES).expect("gates.yaml parses");
     assert_eq!(g.gates.len(), 8, "expected G1..G7 plus D1");
     let ids: BTreeSet<&str> = g.gates.iter().map(|x| x.id.as_str()).collect();
     for n in 1..=7 {
@@ -231,7 +232,7 @@ fn gates_are_eight_and_well_formed() {
 /// change with it, so this asserts the current honest state.
 #[test]
 fn gate_evidence_is_declared() {
-    let g: GateFile = serde_yaml::from_str(GATES).expect("gates.yaml parses");
+    let g: GateFile = serde_saphyr::from_str(GATES).expect("gates.yaml parses");
     for gate in &g.gates {
         if gate.origin_rows == 0 {
             assert_eq!(
