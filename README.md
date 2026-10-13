@@ -9,9 +9,9 @@ Offline. Deterministic. No API key. Single binary. No network code at all - see
 **Ships rules, not data.** The tool carries no program names, no chains, no reward tables. You
 point it at *your own* private ledger of the programs you hunt.
 
-`@bash
+```bash
 vg check finding.md
-`@
+```
 
 > **Name collision.** `vg` is also the name of an unrelated bioinformatics tool. This crate ships
 > **both** a `vg` and a `viability-gate` binary, so you can install and call whichever does not
@@ -25,7 +25,7 @@ fails if the README has drifted from it.
 <!-- BEGIN:example -->
 
 ```text
-viability-gate 0.2.0  —  finding.md
+viability-gate 0.3.0  —  finding.md
 
   OUTCOME   KILL
             A hard blocker fired. Do not submit as written.
@@ -222,20 +222,19 @@ It was previously called "estimated payout odds", which claimed far more than it
 subtract from it - a gate that did not run produces `INCOMPLETE` instead, which is more honest than
 inventing a number for it. `--min-score` remains available as an optional CI threshold.
 
-### Deprecated JSON fields
+### Removed JSON fields
 
-For one minor version, the JSON report also carries the pre-0.2.0 field names:
+0.2.0 carried the pre-0.2.0 field names for one minor version, as announced. 0.3.0 removes them,
+along with the `deprecated_fields` list that named them:
 
-| Deprecated | Replacement | Note |
-|---|---|---|
-| `odds` | `viability_score` | same value |
-| `verdict` | `outcome` | now carries the outcome word, a superset of the old vocabulary |
-
-Both are listed in `deprecated_fields` in the payload. They will be removed in 0.3.0.
+| Removed in 0.3.0 | Use instead |
+|---|---|
+| `odds` | `viability_score` (same value) |
+| `verdict` | `outcome` (the outcome word, a superset of the old vocabulary) |
 
 ## Usage
 
-`@bash
+```bash
 # scaffold the inputs a new target needs (start here)
 vg init my-target/
 
@@ -262,14 +261,14 @@ vg rules
 
 # measure the catalog against a labelled set
 vg bench --rejected rejected/ --accepted accepted/ --labels labels.csv
-`@
+```
 
 ### `--known-issues` - the known-issue matcher (unvalidated)
 
 Duplicates are the largest single rejection category and the one no pattern over your finding's
 prose can find, because the signal lives in an **external corpus**. This flag is that corpus:
 
-`@yaml
+```yaml
 known_issues:
   - id: KI-1
     summary: "Rounding in share calculation favours the protocol; accepted as intended"
@@ -277,7 +276,7 @@ known_issues:
     patterns:
       - "round(ing|s)? .{0,40}(favou?rs?|benefits?) the protocol"
       - "dust.{0,30}(stuck|stranded|unclaimable)"
-`@
+```
 
 A match is a **hard fail** with rule id `KI:<id>`, because a known issue is Not Applicable rather
 than Informational - a materially worse outcome than an unpaid finding.
@@ -297,11 +296,11 @@ A text pattern cannot see your own earlier submissions, and that is a real failu
 97 rows in the source log repeat a family that was already present**, so a local history beats any
 regex over a draft.
 
-`@bash
+```bash
 vg log add --family "stale cached exchange rate" --outcome rejected \
            --note "closed as a known design tradeoff"
 vg log check draft.md
-`@
+```
 
 The log is a local YAML file (`.vg-history.yaml` by default) that is **gitignored and never
 uploaded** - the tool has no network code. Matching is deterministic token overlap (Jaccard over
@@ -313,9 +312,9 @@ no log supplied, **G7 reports `?`** rather than passing.
 The largest barrier to using this tool is not installing it, it is the inputs. `vg init` writes
 every file, commented, so the tool teaches its own format:
 
-`@bash
+```bash
 vg init my-target/
-`@
+```
 
 It writes `ledger.yaml`, `known-issues.yaml`, `scope.txt`, `history.yaml` and `NOTES.md`.
 Existing files are never overwritten without `--force`.
@@ -325,9 +324,9 @@ Existing files are never overwritten without `--force`.
 
 ### `vg bench` - measure it yourself
 
-`@bash
+```bash
 vg bench --rejected rejected/ --accepted accepted/ --labels labels.csv
-`@
+```
 
 Reports, per rule, the fire rate on the rejected set, the fire rate on the accepted set, and the
 **false-KILL rate on the accepted set**. That last number is the one that matters and the one this
@@ -352,11 +351,11 @@ Nothing is uploaded, cached, or reported anywhere.
 
 ### In CI
 
-`@yaml
+```yaml
 - name: viability gate
   run: |
     vg check findings/*.md --json --min-score 50 --fail-on-kill
-`@
+```
 
 Use `--fail-on-kill` rather than failing on any finding - HOLD is a normal, healthy state and
 failing on it trains you to ignore the tool.
@@ -404,33 +403,33 @@ Read these before trusting a `CLEAR`.
 
 ## Install
 
-`@bash
-# from the repository
+```bash
+# from crates.io
+cargo install viability-gate
+
+# or from the repository
 cargo install --git https://github.com/KhomDev/viability-gate
 
 # or from a local checkout
 cargo install --path .
-`@
+```
 
 Prebuilt binaries for linux, macos and windows are attached to each `v*` release tag, with SHA-256
 checksums and build attestations. See [docs/install.md](docs/install.md).
-
-`cargo install viability-gate` from crates.io is **not available yet** - publishing is pending a
-human decision, and this README will say so until it happens.
 
 The rules are **embedded in the binary**, so the installed tool is self-contained and needs no
 data directory. Override them with `--rules <DIR>`.
 
 ## Testing
 
-`@bash
+```bash
 cargo test --release
 cargo fmt --all -- --check
 cargo clippy --all-targets -- -D warnings
 python scripts/check_tripwires.py
 python scripts/gen_rule_docs.py --check
 bash scripts/regen-readme-examples.sh --check
-`@
+```
 
 The suite is the mechanism that keeps the catalog honest:
 
@@ -456,7 +455,7 @@ Which suspected defects were reproduced and which were not is recorded in
 Rules live in [rules/anti-patterns.yaml](rules/anti-patterns.yaml) and
 [rules/gates.yaml](rules/gates.yaml). They are data, not code. A rule is:
 
-`@yaml
+```yaml
 - id: P17
   title: No attacker-win scenario
   group: E
@@ -469,7 +468,7 @@ Rules live in [rules/anti-patterns.yaml](rules/anti-patterns.yaml) and
   origin_rows: 6
   evidence: in_sample
   fp_rate: null
-`@
+```
 
 `any_of` needs one match; `all_of` needs every match; `none_of` suppresses the rule entirely.
 Patterns are case-insensitive regexes unless the pattern itself says otherwise.
@@ -516,7 +515,7 @@ Patterns are case-insensitive regexes unless the pattern itself says otherwise.
   exclusion clauses that make Gates 1 and 2 mechanical
 
 Pin to a tag, not to `main`:
-[viability-gate v0.2.0](https://github.com/KhomDev/viability-gate/tree/v0.2.0).
+[viability-gate v0.3.0](https://github.com/KhomDev/viability-gate/tree/v0.3.0).
 
 ## License
 
@@ -528,8 +527,9 @@ Pin to a tag, not to `main`:
 | `docs/`, `README.md` (prose) | MIT |
 | `.vg-history.yaml`, any `my-ledger*.yaml` | **yours**; gitignored and never distributed |
 
-**Note on `rules/*.yaml`.** These are shipped as MIT, matching the code, because they are embedded
-in the binary and the repository's `LICENSE` file is the MIT text. The author has flagged this as a
-point a human may want to revisit - a data-oriented license such as CC-BY-4.0 would also be
-defensible for the catalog. **It has not been changed**, because changing a license is a decision
-for the repository owner, not for a tooling pass.
+**Scope.** The MIT grant in `LICENSE` covers the entire repository, including the data files in
+`rules/` and the prose in `docs/` and this README. You may extract the catalog, ship it as a
+ruleset in another tool, or adapt it, under the same MIT terms as the code. The catalog is my
+original work, derived from my own rejection log; the classified log is published separately in
+[rejection-taxonomy](https://github.com/KhomDev/rejection-taxonomy), and this licence does not
+change the terms of that repository.
