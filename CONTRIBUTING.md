@@ -102,7 +102,7 @@ Conventional commits, one logical change each:
 feat(rules): add P23 for ...
 fix(engine): stop P18 firing on negated statements
 docs(calibration): state both denominators for the corpus-only class
-chore(deps): bump serde_yaml
+chore(deps): bump serde-saphyr
 ```
 
 The subject line is a complete sentence about what changed. The body says what

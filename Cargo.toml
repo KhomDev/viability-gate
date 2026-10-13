@@ -1,6 +1,6 @@
 [package]
 name = "viability-gate"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "Offline, deterministic pre-submission checker for smart-contract audit findings. Heuristic, in-sample calibrated."
 license = "MIT"
@@ -8,7 +8,7 @@ repository = "https://github.com/KhomDev/viability-gate"
 keywords = ["bug-bounty", "smart-contract", "audit", "triage", "security"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
-rust-version = "1.85"
+rust-version = "1.89"
 
 # Two binaries, same code: src/bin/vg.rs and src/bin/viability-gate.rs. "vg"
 # collides with an unrelated bioinformatics tool of the same name, so both names
@@ -19,7 +19,7 @@ clap = { version = "4", features = ["derive"] }
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-serde_yaml = "0.9"
+serde-saphyr = "2"
 
 [profile.release]
 opt-level = 3

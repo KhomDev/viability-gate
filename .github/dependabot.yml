@@ -1,7 +1,7 @@
 version: 2
 updates:
-  # Rust dependencies. The dependency graph is deliberately tiny (five direct
-  # crates, 39 packages total) and every addition is a supply-chain decision, so
+  # Rust dependencies. The dependency graph is deliberately small (five direct
+  # crates, 49 packages total) and every addition is a supply-chain decision, so
   # updates are grouped into one pull request rather than one per crate.
   - package-ecosystem: cargo
     directory: "/"

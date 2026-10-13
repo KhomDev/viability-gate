@@ -269,7 +269,7 @@ pub fn log_add(
 }
 
 fn parse_log(text: &str) -> Result<Vec<crate::model::LogEntry>, String> {
-    if let Ok(list) = serde_yaml::from_str::<Vec<crate::model::LogEntry>>(text) {
+    if let Ok(list) = serde_saphyr::from_str::<Vec<crate::model::LogEntry>>(text) {
         return Ok(list);
     }
     #[derive(serde::Deserialize)]
@@ -277,7 +277,7 @@ fn parse_log(text: &str) -> Result<Vec<crate::model::LogEntry>, String> {
         #[serde(default)]
         submissions: Vec<crate::model::LogEntry>,
     }
-    let w: Wrapper = serde_yaml::from_str(text).map_err(|e| format!("{e}"))?;
+    let w: Wrapper = serde_saphyr::from_str(text).map_err(|e| format!("{e}"))?;
     Ok(w.submissions)
 }
 

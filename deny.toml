@@ -1,6 +1,6 @@
 # cargo-deny configuration.
 #
-# The dependency graph is deliberately tiny: five direct crates, 39 packages
+# The dependency graph is deliberately small: five direct crates, 49 packages
 # total. Every addition is a supply-chain decision, so the checks here are strict
 # rather than advisory.
 
@@ -15,15 +15,7 @@ targets = [
 
 [advisories]
 version = 2
-ignore = [
-    # unsafe-libyaml is unmaintained; it arrives through serde_yaml 0.9, which is
-    # archived too. "Unmaintained" is not a known vulnerability, and the only
-    # YAML this tool parses is its own embedded catalog and local files the user
-    # supplies. Swapping the YAML parser can change how the catalog parses, so it
-    # ships as its own change with its own tests, not inside a release. Remove
-    # this entry when serde_yaml is replaced.
-    { id = "RUSTSEC-2024-0449", reason = "unmaintained, not vulnerable; serde_yaml replacement tracked for the next minor version" },
-]
+ignore = []
 # Deny on any advisory with a known fix. An advisory with no fix is reported but
 # does not block, because blocking on it would mean blocking on upstream.
 yanked = "deny"

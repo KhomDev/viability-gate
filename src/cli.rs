@@ -6,7 +6,7 @@
 
 use crate::{bench, engine, init, model, render};
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use engine::CompiledRule;
 use model::*;
 use std::path::{Path, PathBuf};
@@ -201,11 +201,18 @@ enum LogAction {
 }
 
 pub fn main_entry() -> ExitCode {
-    let cli = Cli::parse();
+    main_entry_named("vg")
+}
+
+/// Entry point for a binary installed under `name`, so `--version`, `--help`
+/// and error prefixes say `viability-gate` when that is what the user ran.
+pub fn main_entry_named(name: &'static str) -> ExitCode {
+    let matches = Cli::command().name(name).bin_name(name).get_matches();
+    let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
     match run(cli) {
         Ok(code) => code,
         Err(msg) => {
-            eprintln!("vg: {msg}");
+            eprintln!("{name}: {msg}");
             ExitCode::from(2)
         }
     }
@@ -227,9 +234,9 @@ fn load_rules(dir: Option<&Path>) -> Result<(Vec<CompiledRule>, Vec<Gate>), Stri
     };
 
     let parsed: RuleFile =
-        serde_yaml::from_str(&ap_text).map_err(|e| format!("anti-patterns.yaml: {e}"))?;
+        serde_saphyr::from_str(&ap_text).map_err(|e| format!("anti-patterns.yaml: {e}"))?;
     let gates: GateFile =
-        serde_yaml::from_str(&gate_text).map_err(|e| format!("gates.yaml: {e}"))?;
+        serde_saphyr::from_str(&gate_text).map_err(|e| format!("gates.yaml: {e}"))?;
 
     let compiled = parsed
         .rules
@@ -280,7 +287,7 @@ fn read_ledger(path: &Option<PathBuf>) -> Result<Option<Vec<LedgerEntry>>, Strin
         std::fs::read_to_string(p).map_err(|e| format!("cannot read {}: {e}", p.display()))?;
     let text = strip_bom(text);
     let entries: Vec<LedgerEntry> =
-        serde_yaml::from_str(&text).map_err(|e| format!("{}: {e}", p.display()))?;
+        serde_saphyr::from_str(&text).map_err(|e| format!("{}: {e}", p.display()))?;
     Ok(Some(entries))
 }
 
@@ -295,14 +302,14 @@ fn read_known_issues(path: &Option<PathBuf>) -> Result<Option<Vec<KnownIssue>>, 
         std::fs::read_to_string(p).map_err(|e| format!("cannot read {}: {e}", p.display()))?;
     let text = strip_bom(text);
 
-    if let Ok(list) = serde_yaml::from_str::<Vec<KnownIssue>>(&text) {
+    if let Ok(list) = serde_saphyr::from_str::<Vec<KnownIssue>>(&text) {
         return Ok(Some(list));
     }
     #[derive(serde::Deserialize)]
     struct Wrapper {
         known_issues: Vec<KnownIssue>,
     }
-    let w: Wrapper = serde_yaml::from_str(&text).map_err(|e| format!("{}: {e}", p.display()))?;
+    let w: Wrapper = serde_saphyr::from_str(&text).map_err(|e| format!("{}: {e}", p.display()))?;
     Ok(Some(w.known_issues))
 }
 
@@ -318,14 +325,14 @@ fn read_log(path: &Option<PathBuf>) -> Result<Option<Vec<LogEntry>>, String> {
     let text =
         std::fs::read_to_string(p).map_err(|e| format!("cannot read {}: {e}", p.display()))?;
     let text = strip_bom(text);
-    if let Ok(list) = serde_yaml::from_str::<Vec<LogEntry>>(&text) {
+    if let Ok(list) = serde_saphyr::from_str::<Vec<LogEntry>>(&text) {
         return Ok(Some(list));
     }
     #[derive(serde::Deserialize)]
     struct Wrapper {
         submissions: Vec<LogEntry>,
     }
-    let w: Wrapper = serde_yaml::from_str(&text).map_err(|e| format!("{}: {e}", p.display()))?;
+    let w: Wrapper = serde_saphyr::from_str(&text).map_err(|e| format!("{}: {e}", p.display()))?;
     Ok(Some(w.submissions))
 }
 
