@@ -17,6 +17,8 @@ What it checks:
   4. Banned phrases that the calibration rewrite removed, and CLI names that do
      not exist. These are exact-match checks; each one has been true at least
      once.
+  5. Code fences are well formed, and the tag the README tells readers to pin
+     is the version in Cargo.toml.
 
 Run: python scripts/check_readme.py
 Exit code 0 = in sync, 1 = drift, 2 = could not run.
@@ -196,6 +198,32 @@ def main() -> int:
     for target, why in REQUIRED_LINKS:
         if target not in readme:
             problems.append("README.md does not link " + target + ": " + why)
+
+    # 7. code fences. A shell rewrite once turned twenty fence lines into "`@",
+    # which GitHub renders as text; the README shipped that way. An unbalanced
+    # fence count catches the general case, the literal catches that one.
+    mangled = re.findall(r"^\s*`@", readme, re.MULTILINE)
+    if mangled:
+        problems.append(
+            "README.md has " + str(len(mangled)) + " line(s) starting with '`@'; "
+            "a code fence is three backticks"
+        )
+    fences = re.findall(r"^\s*```", readme, re.MULTILINE)
+    if len(fences) % 2:
+        problems.append(
+            "README.md has an odd number of code fences (" + str(len(fences)) + "); one block is unclosed"
+        )
+
+    # 8. the pinned tag is the crate version. The README told readers to pin to
+    # a tag that did not exist; at least make it the version being released.
+    cargo = (REPO_ROOT / "Cargo.toml").read_text(encoding="utf-8")
+    vm = re.search(r'^version\s*=\s*"([^"]+)"', cargo, re.MULTILINE)
+    if vm:
+        for tag in sorted(set(re.findall(r"viability-gate/tree/(v[\w.\-]+)", readme))):
+            if tag != "v" + vm.group(1):
+                problems.append(
+                    "README.md pins " + tag + " but Cargo.toml is " + vm.group(1)
+                )
 
     for w in warnings:
         print("warn  " + w)

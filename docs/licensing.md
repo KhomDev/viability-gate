@@ -8,9 +8,9 @@
 | `tests/**` | Test code and fixtures | **MIT** |
 | `scripts/**` | Python tooling | **MIT** |
 | `tools/**` | The calibration harness | **MIT** |
-| `rules/anti-patterns.yaml` | The anti-pattern catalog (data) | **MIT** — see the note below |
-| `rules/gates.yaml` | The gate definitions (data) | **MIT** — see the note below |
-| `rules/packs/**` | Ecosystem token packs (data) | **MIT** — see the note below |
+| `rules/anti-patterns.yaml` | The anti-pattern catalog (data) | **MIT** |
+| `rules/gates.yaml` | The gate definitions (data) | **MIT** |
+| `rules/packs/**` | Ecosystem token packs (data) | **MIT** |
 | `docs/**`, `README.md` | Documentation | **MIT** |
 | `examples/**` | Synthetic fixtures | **MIT** |
 
@@ -18,32 +18,19 @@ The repository `LICENSE` is the MIT licence and it is the only licence text in
 the tree. There is no per-directory licence file and no `SPDX-License-Identifier`
 header anywhere.
 
-## The open question: `rules/*.yaml`
+## `rules/*.yaml` is covered (resolved in 0.3.0)
 
-**Listed for the repository owner; not resolved here, and not changed here.**
+Up to 0.2.0 this was an open question: the catalog is data rather than code, and
+a reader who wanted to reuse it could reasonably ask whether a licence that reads
+as a software licence was meant to cover a data file.
 
-The rule catalog is prose written by the author, derived from the author's own
-rejection log. It is a creative work, and MIT on the repository plainly covers it
-by default. The ambiguity is narrower than that and has two parts:
-
-1. **The catalog is data, not code.** A reader who wants to reuse the *catalog*
-   — extract it into another tool, or ship it as a ruleset — may reasonably ask
-   whether the MIT grant, which reads as a software licence, was intended to
-   cover a data file. It almost certainly was, and the answer should be stated
-   rather than inferred.
-2. **The catalog is derived from a private log.** The derivation is the author's
-   own analysis, so no third-party rights are implicated. But "derived from a
-   dataset that is not published" is worth a sentence in the licence story,
-   because a reuser cannot check the derivation.
-
-**Recommended resolution** (a decision for the owner, not for this task): add a
-short "Scope" paragraph to `README.md`'s License section stating that the MIT
-grant covers the entire repository including `rules/` and `docs/`, and that the
-catalog is original work derived from the author's own unpublished dataset. That
-is one paragraph, it removes the ambiguity, and it needs no second licence file.
-
-**Not done here, on purpose.** Legal wording is a stop gate. This document
-records the state and the recommendation; it does not act on them.
+It was. The **Scope** paragraph in `README.md`'s License section now says so: the
+MIT grant covers the entire repository, including `rules/` and `docs/`, and the
+catalog may be extracted, shipped as a ruleset in another tool, or adapted under
+the same terms. The catalog is the author's original work, derived from the
+author's own rejection log. The classified log is published separately in
+[rejection-taxonomy](https://github.com/KhomDev/rejection-taxonomy), whose terms
+this licence does not change. No second licence file was added.
 
 ## What is deliberately not bundled
 

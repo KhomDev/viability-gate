@@ -1,14 +1,23 @@
 # Install
 
-Three ways, in order of how much you should trust them today.
+Three ways. All three install the same code.
 
-## 1. From the repository (works now)
+## 1. From crates.io
+
+```bash
+cargo install viability-gate
+```
+
+Published from 0.3.0 onward. The crate version matches the `v*` tag it was
+published from.
+
+## 2. From the repository
 
 ```bash
 cargo install --git https://github.com/KhomDev/viability-gate
 ```
 
-This installs **both** binaries, `vg` and `viability-gate`. They are the same
+Every method installs **both** binaries, `vg` and `viability-gate`. They are the same
 program; see [the name collision](#the-vg-name-collision) below.
 
 Requires Rust 1.85 or newer (the MSRV is declared in `Cargo.toml` and checked in
@@ -23,7 +32,7 @@ cd viability-gate
 cargo install --path .
 ```
 
-## 2. From a release binary
+## 3. From a release binary
 
 Releases are published on tags matching `v*`. Each release carries prebuilt
 binaries for Linux, macOS and Windows, a `SHA256SUMS` file, and a build
@@ -42,17 +51,6 @@ The attestation (`gh attestation verify`) ties the binary to the workflow run
 that built it. It proves the binary came from this repository's release
 workflow — it does not prove the source is good, which is what
 [`docs/calibration.md`](calibration.md) is for.
-
-## 3. From crates.io
-
-```bash
-cargo install viability-gate
-```
-
-**Not yet available.** Publishing to crates.io is a deliberate stop gate: it is
-irreversible, and the crate name is claimed permanently. Until it is done, use
-one of the two methods above. The `cargo install viability-gate` line is in
-`README.md` as the intended end state, not as a working instruction.
 
 ## The `vg` name collision
 

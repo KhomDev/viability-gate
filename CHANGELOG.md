@@ -7,6 +7,44 @@ Notable changes to `viability-gate`. The format follows
 Dates are the commit dates. Entries are written after the change, and a number
 appears here only if it came from a command that can be re-run.
 
+## [Unreleased]
+
+## [0.3.0] - 2026-10-13
+
+The first tagged release in this repository, and the first on crates.io. It
+contains the changes listed here, the history-reset fixes below, and everything
+under "Changes since 0.2.0" further down.
+
+### Removed
+
+- **The deprecated JSON fields `odds` and `verdict`, and the `deprecated_fields`
+  list that named them.** 0.2.0 announced their removal in 0.3.0. Use
+  `viability_score` and `outcome`, which carry the same values.
+
+### Fixed
+
+- **Twenty code-fence lines in `README.md` were `` `@ `` instead of three
+  backticks**, so ten code blocks rendered as plain text on GitHub. The defect
+  came in with a shell rewrite and shipped in the initial public release.
+- **The README told readers to pin `v0.2.0`, and the changelog linked
+  `v0.1.0` and `v0.2.0`.** None of those tags exist in this repository, because
+  the history was reset. The pin is now `v0.3.0`; the old versions are listed
+  without links.
+
+### Changed
+
+- **Licence scope stated.** The README's License section now says that the MIT
+  grant covers the whole repository, including the catalog in `rules/`, and
+  `docs/licensing.md` records the question as resolved.
+- **`docs/install.md` and the README** list `cargo install viability-gate` as the
+  first install method.
+
+### Added
+
+- **`scripts/check_readme.py` checks code fences and the pinned tag.** It fails on
+  a `` `@ `` fence line, on an odd number of fences, and when the tag the README
+  pins differs from the version in `Cargo.toml`.
+
 ## Repository history reset - 2026-10-10
 
 ### Fixed
@@ -37,7 +75,7 @@ The tree itself is unchanged except for the two fixes recorded here.
   nearest, button) must pass, and the token itself must fail. CI runs it in the
   tripwires job, so a regression in the boundary rule cannot land silently.
 
-## [Unreleased]
+## Changes since 0.2.0 - released in 0.3.0
 
 ### Added
 
@@ -101,7 +139,7 @@ The tree itself is unchanged except for the two fixes recorded here.
 - Private-workspace path prefixes from the shipped catalog, the docs and the
   reproduction instructions. Each rule's source is now `doc: docs/rules/Pn.md`.
 
-## [0.2.0] — 2026-10-09
+## 0.2.0 — 2026-10-09 (untagged; predates the history reset)
 
 ### Added
 
@@ -117,7 +155,7 @@ The tree itself is unchanged except for the two fixes recorded here.
 
 - The scaffold no longer offers the removed `any` tier shape.
 
-## [0.1.0] — 2026-10-08
+## 0.1.0 — 2026-10-08 (untagged; predates the history reset)
 
 ### Added
 
@@ -126,6 +164,5 @@ The tree itself is unchanged except for the two fixes recorded here.
 - The rule catalog and gate definitions as data, embedded in the binary.
 - The fixture suite: one positive and one negative case per anti-pattern.
 
-[Unreleased]: https://github.com/KhomDev/viability-gate/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/KhomDev/viability-gate/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/KhomDev/viability-gate/releases/tag/v0.1.0
+[Unreleased]: https://github.com/KhomDev/viability-gate/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/KhomDev/viability-gate/releases/tag/v0.3.0

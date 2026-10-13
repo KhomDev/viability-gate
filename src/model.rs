@@ -362,16 +362,6 @@ pub struct Report {
     /// An UNCALIBRATED HEURISTIC. It is not a probability, and it is not
     /// "payout odds". Gates do not deduct from it.
     pub viability_score: u32,
-    /// Deprecated alias for `viability_score` under its pre-0.2.0 name. Kept for
-    /// one minor version so an existing CI consumer does not break silently.
-    #[serde(rename = "odds")]
-    pub odds_deprecated: u32,
-    /// Deprecated alias for `outcome` under its pre-0.2.0 name. In 0.2.0 it
-    /// carries the OUTCOME word, which is a superset of the old vocabulary.
-    #[serde(rename = "verdict")]
-    pub verdict_deprecated: String,
-    /// Names the fields above, so a consumer can see they are deprecated.
-    pub deprecated_fields: Vec<String>,
     pub threshold: u32,
     pub findings: Vec<Finding>,
     pub passed: Vec<String>,
