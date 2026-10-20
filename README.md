@@ -25,7 +25,7 @@ fails if the README has drifted from it.
 <!-- BEGIN:example -->
 
 ```text
-viability-gate 0.4.0  —  finding.md
+viability-gate 0.4.1  —  finding.md
 
   OUTCOME   KILL
             A hard blocker fired. Do not submit as written.
@@ -516,7 +516,7 @@ Patterns are case-insensitive regexes unless the pattern itself says otherwise.
   exclusion clauses that make Gates 1 and 2 mechanical
 
 Pin to a tag, not to `main`:
-[viability-gate v0.4.0](https://github.com/KhomDev/viability-gate/tree/v0.4.0).
+[viability-gate v0.4.1](https://github.com/KhomDev/viability-gate/tree/v0.4.1).
 
 ## License
 
@@ -534,3 +534,7 @@ ruleset in another tool, or adapt it, under the same MIT terms as the code. The 
 original work, derived from my own rejection log; the classified log is published separately in
 [rejection-taxonomy](https://github.com/KhomDev/rejection-taxonomy), and this licence does not
 change the terms of that repository.
+
+**No bundled data.** This tool ships rules and schemas only. It contains no program names, chains,
+reward tables, scope text or target data of any kind. All target-specific input is supplied by the
+user at runtime and is never uploaded, cached or reported.

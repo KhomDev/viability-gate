@@ -19,11 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-## No bundled data
-
-This tool ships rules and schemas only. It contains no program names, chains,
-reward tables, scope text or target data of any kind. All target-specific input
-is supplied by the user at runtime and is never uploaded, cached or reported.
