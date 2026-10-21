@@ -37,7 +37,7 @@ this licence does not change. No second licence file was added.
 The tool ships **no** third-party data:
 
 - No program names, no chain names, no reward tables.
-- No rejection log. The 97-row dataset lives in
+- No rejection log. The 111-row dataset lives in
   [rejection-taxonomy](https://github.com/KhomDev/rejection-taxonomy) under its
   own licence and is not vendored here.
 - No prior-audit PDFs and no known-issues corpora. Those are user inputs
