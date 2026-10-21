@@ -9,6 +9,17 @@ appears here only if it came from a command that can be re-run.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-20
+
+### Fixed
+
+- **`LICENSE` is now the plain MIT text only.** It previously carried an extra
+  "No bundled data" section after the MIT body, which made GitHub's license
+  detector classify the repository as "Other" instead of MIT. The MIT text is
+  unchanged (byte-standard SPDX template); the "No bundled data" note moved to
+  the License section of `README.md`, where it reads the same. No code, rules,
+  dependencies or behaviour changed.
+
 ## [0.4.0] - 2026-10-13
 
 ### Changed
