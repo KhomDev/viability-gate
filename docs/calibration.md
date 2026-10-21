@@ -1,5 +1,13 @@
 # Calibration — viability-gate against 97 logged rejections
 
+> **Dated note (2026-10-21).** Every number in this document was measured on the **original 97**
+> logged rejections — the in-sample corpus the 22 anti-patterns were derived from. The published
+> rejection dataset has since grown to **111 rows** (rejection-taxonomy v0.4.0). This recall study
+> has **not** been re-run against the 14 added rows and these figures are left exactly as measured;
+> the `59/97`, `14/59` (23.7%), `45/59` (76.3%), 52-point-gap and `48/59` (81%) numbers all refer
+> to the original 97-row log. Only the reachable-automation counts in the repository README track
+> the 111-row dataset.
+
 **Read this first: the measurement below is in-sample.** The 22 anti-patterns were
 derived from the patterns in this same log, so the tool was built knowing these
 outcomes. **23.7% is closer to a ceiling than to an unbiased estimate.** Every

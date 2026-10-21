@@ -9,6 +9,21 @@ appears here only if it came from a command that can be re-run.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-21
+
+### Changed
+
+- **Docs: the `Related` / reachable-automation numbers now track
+  [rejection-taxonomy](https://github.com/KhomDev/rejection-taxonomy) v0.4.0 (111 rows).** The
+  published dataset grew from 97 to 111 rows, so the README automation table is recomputed from
+  the new `earliest_gate` split: `design_review` 12 → 13, `P17_no_attacker_win` 6 → 12,
+  `D1_duplicate_check` 34 → 41 (still unreachable), reachable total **63 → 70**, and the headline
+  becomes "70 of 111 rejections (63.1%), not 70.3%". Dataset-size references elsewhere in the docs
+  move to 111. The in-sample recall study (59/97 matched, 14/59 strict, 45/59 lenient) is **not**
+  re-run and is left exactly as measured against the original 97 rows; a dated note in `README.md`
+  and `docs/calibration.md` records that split. A docs-accuracy release — no code, rules or
+  behaviour changed.
+
 ## [0.4.1] - 2026-10-20
 
 ### Fixed
