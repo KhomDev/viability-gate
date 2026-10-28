@@ -25,7 +25,7 @@ fails if the README has drifted from it.
 <!-- BEGIN:example -->
 
 ```text
-viability-gate 0.4.2  —  finding.md
+viability-gate 0.4.3  —  finding.md
 
   OUTCOME   KILL
             A hard blocker fired. Do not submit as written.
@@ -72,13 +72,13 @@ I calibrated this against my own rejection log: **59 of 97 logged rejections** m
 original finding text at high confidence, then scored on whether the tool flagged the same gate
 the program actually closed it on.
 
-> **Dated note (2026-10-21).** This recall study was measured on the **original 97** logged
-> rejections. The published dataset has since grown to **111 rows** (rejection-taxonomy v0.4.0),
-> and the recall study has **not** been re-run against the 14 added rows. Every `59/97`, `14/59`,
+> **Dated note (2026-10-28).** This recall study was measured on the **original 97** logged
+> rejections. The published dataset has since grown to **113 rows** (rejection-taxonomy v0.5.0),
+> and the recall study has **not** been re-run against the 16 added rows. Every `59/97`, `14/59`,
 > `45/59`, `48/59` and related figure in this section and in
 > [docs/calibration.md](docs/calibration.md) is therefore the original in-sample measurement,
 > unchanged. Only the reachable-automation counts under [Related](#related) track the current
-> 111-row dataset.
+> 113-row dataset.
 
 | Scoring | Result |
 |---|---:|
@@ -301,7 +301,7 @@ corpus yet. That limitation is structural, not something better patterns can fix
 ### `vg log` - your own submission history (gate G7)
 
 A text pattern cannot see your own earlier submissions, and that is a real failure mode: **12 of the
-111 rows in the source log repeat a family that was already present**, so a local history beats any
+113 rows in the source log repeat a family that was already present**, so a local history beats any
 regex over a draft.
 
 ```bash
@@ -484,16 +484,16 @@ Patterns are case-insensitive regexes unless the pattern itself says otherwise.
 
 ## Related
 
-- [rejection-taxonomy](https://github.com/KhomDev/rejection-taxonomy) - the 111 rejections this
+- [rejection-taxonomy](https://github.com/KhomDev/rejection-taxonomy) - the 113 rejections this
   catalog is derived from. **Which log buckets does this tool automate?** The catalog can reach
-  70 of the 111 rows, measured against the `earliest_gate` column:
+  72 of the 113 rows, measured against the `earliest_gate` column:
 
   | Reachable bucket | Rows | Rules that reach it |
   |---|---:|---|
   | `G2_exclusion_clause` | 20 | P2, P3 |
   | `design_review` | 13 | P1, P13 |
   | `G4_prior_audit` | 7 | P18 |
-  | `P17_no_attacker_win` | 12 | P17 |
+  | `P17_no_attacker_win` | 14 | P17 |
   | `G1_severity_floor` | 5 | P16 |
   | `G3_scope_tree` | 4 | P5 |
   | `REALISM` | 3 | P6, P11, P21, P22 |
@@ -502,7 +502,7 @@ Patterns are case-insensitive regexes unless the pattern itself says otherwise.
   | `program_ceiling` | 1 | (P16's severity-floor class) |
   | `P19_headline_mismatch` | 1 | P19 |
   | `P20_cooperating_party` | 1 | P20 |
-  | **reachable total** | **70** | |
+  | **reachable total** | **72** | |
 
   `D1_duplicate_check` is **41 rows and is not reachable** — the signal lives in the program's
   known-issues list, not in the finding's prose. That is the structural ceiling, and it is the
@@ -512,7 +512,7 @@ Patterns are case-insensitive regexes unless the pattern itself says otherwise.
   catalog maps onto them: `P7_best_practice`, `P12_no_persisted_impact` and
   `P18_design_tradeoff`. The private log recorded those findings under the root-cause column
   rather than the gate column, so a rule firing on one of them cannot be scored against a gate
-  token. Said plainly: **the catalog automates 70 of 111 rejections (63.1%), not 70.3%.** The 70.3%
+  token. Said plainly: **the catalog automates 72 of 113 rejections (63.7%), not 69.0%.** The 69.0%
   figure counts D1, which no pattern over a draft finding can find.
 
   ```bash
@@ -524,7 +524,7 @@ Patterns are case-insensitive regexes unless the pattern itself says otherwise.
   exclusion clauses that make Gates 1 and 2 mechanical
 
 Pin to a tag, not to `main`:
-[viability-gate v0.4.2](https://github.com/KhomDev/viability-gate/tree/v0.4.2).
+[viability-gate v0.4.3](https://github.com/KhomDev/viability-gate/tree/v0.4.3).
 
 ## License
 
