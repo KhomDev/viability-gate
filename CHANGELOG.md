@@ -9,6 +9,35 @@ appears here only if it came from a command that can be re-run.
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-28
+
+### Changed
+
+- **CI now enforces the reachable-automation total against the published
+  taxonomy.** `scripts/check_readme.py` only checks the "catalog reaches N of M"
+  number when the sibling dataset is on disk at `../rejection-taxonomy`; in CI it
+  was never cloned, so the block was silently skipped and the number was only
+  locally true. The `generated-docs` job now resolves the latest
+  `KhomDev/rejection-taxonomy` tag, checks it out, and places it where
+  `check_readme.py` expects — so the total is CI-enforced, not just asserted.
+- **Docs: the `Related` / reachable-automation numbers now track
+  [rejection-taxonomy](https://github.com/KhomDev/rejection-taxonomy) v0.5.0 (113
+  rows).** The published dataset grew from 111 to 113 rows (both additions are
+  `P17_no_attacker_win`), so the README automation table is recomputed:
+  `P17_no_attacker_win` 12 → 14, reachable total **70 → 72**, and the headline
+  becomes **the catalog automates 72 of 113 rejections (63.7%)**.
+  `D1_duplicate_check` stays 41 and unreachable.
+
+### Unchanged (reviewed, no change)
+
+- **No 23rd anti-pattern.** The two new rejections were reviewed against the
+  catalog. Both are permanent-liveness / DoS wedges with no attacker-win and map
+  cleanly onto the existing **P17 (No attacker-win scenario)**; no genuinely new,
+  prose-detectable class emerged. The catalog stays at exactly 22.
+- **The 59/97 recall study is not re-run here.** It remains the original
+  in-sample measurement; a calibration re-run against the current dataset is a
+  separate, dedicated pass.
+
 ## [0.4.2] - 2026-10-21
 
 ### Changed
